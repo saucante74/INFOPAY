@@ -9,7 +9,7 @@ serveur séparé pour ce projet.
 import chromadb
 from chromadb.utils import embedding_functions
 
-CHROMA_PATH = "./chroma_data"
+CHROMA_PATH = "./data/chroma_data"
 COLLECTION_NAME = "payslips"
 
 _client = chromadb.PersistentClient(path=CHROMA_PATH)
