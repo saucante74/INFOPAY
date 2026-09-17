@@ -18,7 +18,7 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-def on_startup():
+def on_startup() -> None:
     init_db()
 
 
@@ -27,5 +27,5 @@ app.include_router(chat.router)
 
 
 @app.get("/api/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}

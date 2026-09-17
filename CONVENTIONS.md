@@ -52,7 +52,7 @@ structural typing, PEP 544 — no inheritance required, just matching method
 signatures) and depend on those instead of concrete classes:
 
 ```python
-# app/agent/interfaces.py
+# app/interfaces.py
 from typing import Protocol
 
 class Extractor(Protocol):

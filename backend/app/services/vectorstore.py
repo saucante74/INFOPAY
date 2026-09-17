@@ -7,13 +7,16 @@ ChromaDB tourne en mode embarqué (PersistentClient), pas besoin de
 serveur séparé pour ce projet.
 
 `ChromaVectorStore` est l'implémentation ChromaDB du Protocol
-`app.agent.interfaces.VectorStore`. Passer à FAISS/Pinecone revient à
+`app.interfaces.VectorStore`. Passer à FAISS/Pinecone revient à
 écrire une classe exposant les mêmes `index()` / `search()` et à la câbler
 dans `app/dependencies.py`.
 """
+from collections.abc import Mapping
 from functools import lru_cache
+from typing import Any, cast
 
 import chromadb
+from chromadb.api.types import Embeddable, EmbeddingFunction
 from chromadb.utils import embedding_functions
 
 CHROMA_PATH = "./data/chroma_data"
@@ -40,7 +43,12 @@ class ChromaVectorStore:
         client = chromadb.PersistentClient(path=path)
         # Embedding function par défaut de Chroma (all-MiniLM-L6-v2, local, gratuit).
         # Suffisant pour ce cas d'usage et évite une dépendance à une API d'embedding.
-        embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+        # cast : la fonction par défaut de Chroma est déclarée
+        # EmbeddingFunction[Documents], alors que get_or_create_collection
+        # attend l'EmbeddingFunction[Embeddable] plus large. Invariance des
+        # génériques côté chromadb, pas une vraie incompatibilité.
+        embedding_fn = cast(EmbeddingFunction[Embeddable],
+                            embedding_functions.DefaultEmbeddingFunction())
         self._collection = client.get_or_create_collection(
             name=collection_name,
             embedding_function=embedding_fn,
@@ -49,16 +57,20 @@ class ChromaVectorStore:
     def index(self, payslip_id: int, mois_annee: str, raw_text: str) -> None:
         chunks = _chunk_text(raw_text)
         ids = [f"payslip-{payslip_id}-chunk-{i}" for i in range(len(chunks))]
-        metadatas = [{"payslip_id": payslip_id, "mois_annee": mois_annee} for _ in chunks]
+        metadatas: list[Mapping[str, str | int | float | bool]] = [
+            {"payslip_id": payslip_id, "mois_annee": mois_annee} for _ in chunks
+        ]
 
         self._collection.add(documents=chunks, ids=ids, metadatas=metadatas)
 
-    def search(self, query: str, n_results: int = 3) -> list[dict]:
+    def search(self, query: str, n_results: int = 3) -> list[dict[str, Any]]:
         results = self._collection.query(query_texts=[query], n_results=n_results)
 
         hits = []
-        documents = results.get("documents", [[]])[0]
-        metadatas = results.get("metadatas", [[]])[0]
+        # QueryResult est un TypedDict total=False : les clés existent mais
+        # peuvent valoir None. `or` couvre les deux cas (absente ou None).
+        documents = (results.get("documents") or [[]])[0]
+        metadatas = (results.get("metadatas") or [[]])[0]
         for doc, meta in zip(documents, metadatas):
             hits.append({"text": doc, "mois_annee": meta.get("mois_annee")})
         return hits
@@ -72,14 +84,3 @@ def get_default_vector_store() -> ChromaVectorStore:
     le client Chroma n'est ouvert que si l'application s'en sert réellement.
     """
     return ChromaVectorStore()
-
-
-def index_payslip(payslip_id: int, mois_annee: str, raw_text: str) -> None:
-    """Compatibilité ascendante : ancienne API fonctionnelle, déléguée à
-    l'instance par défaut. Préférer injecter un `VectorStore`."""
-    get_default_vector_store().index(payslip_id, mois_annee, raw_text)
-
-
-def search_payslip_knowledge(query: str, n_results: int = 3) -> list[dict]:
-    """Compatibilité ascendante : voir `index_payslip`."""
-    return get_default_vector_store().search(query, n_results)

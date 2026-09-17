@@ -9,16 +9,19 @@ paie (Silae, ADP, PayFit, etc.). Le LLM lit le texte brut et le fait
 correspondre au schéma Pydantic, quelle que soit la mise en page.
 
 `ClaudeExtractor` est l'implémentation Claude du Protocol
-`app.agent.interfaces.Extractor`. Une implémentation alternative (autre
+`app.interfaces.Extractor`. Une implémentation alternative (autre
 fournisseur de LLM, extracteur par regex pour les tests) n'a qu'à exposer
 la même méthode `extract()`.
 """
 import io
 from functools import cached_property, lru_cache
+from typing import Any, cast
 
 import pdfplumber
 from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models import LanguageModelInput
 from langchain_core.runnables import Runnable
+from pydantic import BaseModel
 
 from app.models.payslip import PayslipExtraction
 
@@ -59,7 +62,7 @@ class ClaudeExtractor:
         self._temperature = temperature
 
     @cached_property
-    def _structured_llm(self) -> Runnable:
+    def _structured_llm(self) -> Runnable[LanguageModelInput, dict[str, Any] | BaseModel]:
         llm = ChatAnthropic(model=self._model, temperature=self._temperature)
         return llm.with_structured_output(PayslipExtraction)
 
@@ -68,16 +71,12 @@ class ClaudeExtractor:
             raise ValueError("Impossible d'extraire du texte de ce PDF (scan image ?).")
 
         result = self._structured_llm.invoke(EXTRACTION_PROMPT.format(raw_text=raw_text))
-        return result  # type: ignore[return-value]
+        # with_structured_output() est typé `dict | BaseModel` ; il renvoie ici
+        # le schéma passé en argument, donc toujours un PayslipExtraction.
+        return cast(PayslipExtraction, result)
 
 
 @lru_cache(maxsize=1)
 def get_default_extractor() -> ClaudeExtractor:
     """Instance partagée par défaut. Câblée dans `app/dependencies.py`."""
     return ClaudeExtractor()
-
-
-def extract_structured_data(raw_text: str) -> PayslipExtraction:
-    """Compatibilité ascendante : ancienne API fonctionnelle, déléguée à
-    l'instance par défaut. Préférer injecter un `Extractor` dans le nouveau code."""
-    return get_default_extractor().extract(raw_text)

@@ -1,9 +1,9 @@
-from typing import Optional
+from typing import Any, Optional, cast
 
 from langchain_core.tools import tool
 
 from app.dependencies import get_vector_store
-from app.services.analytics import run_analytics_query
+from app.services.analytics import Operation, run_analytics_query
 
 
 @tool
@@ -11,7 +11,7 @@ def query_analytics(
     operation: str,
     champ: str,
     derniers_n_mois: Optional[int] = None,
-) -> dict:
+) -> dict[str, Any]:
     """Calcule une valeur EXACTE (somme, moyenne, min, max) sur les bulletins
     de paie déjà importés par l'utilisateur. Utilise CET outil dès que la
     question porte sur un total, une moyenne, une évolution chiffrée ou une
@@ -26,11 +26,16 @@ def query_analytics(
         derniers_n_mois: nombre de mois les plus récents à considérer.
             Omettre pour utiliser tout l'historique disponible.
     """
-    return run_analytics_query(operation=operation, champ=champ, derniers_n_mois=derniers_n_mois)
+    # `operation` reste un `str` nu : la signature de ce tool est le schéma
+    # envoyé au LLM, un Literal y changerait le contrat. run_analytics_query
+    # valide déjà les valeurs inconnues et renvoie une erreur métier.
+    return run_analytics_query(
+        operation=cast(Operation, operation), champ=champ, derniers_n_mois=derniers_n_mois
+    )
 
 
 @tool
-def search_payslip_knowledge_tool(query: str) -> dict:
+def search_payslip_knowledge_tool(query: str) -> dict[str, Any]:
     """Recherche dans le texte brut des bulletins de paie pour EXPLIQUER
     une notion, une ligne de paie ou un terme technique (ex: 'à quoi
     correspond la sécurité sociale déplafonnée', 'qu'est-ce que le CSG').

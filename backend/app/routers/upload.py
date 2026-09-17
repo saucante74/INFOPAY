@@ -1,9 +1,11 @@
+from collections.abc import Sequence
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Session
 
-from app.agent.interfaces import Extractor, VectorStore
 from app.db import get_session
 from app.dependencies import get_extractor, get_vector_store
+from app.interfaces import Extractor, VectorStore
 from app.models.payslip import Payslip
 from app.services.extraction import extract_text_from_pdf
 
@@ -16,7 +18,7 @@ async def upload_payslip(
     session: Session = Depends(get_session),
     extractor: Extractor = Depends(get_extractor),
     vector_store: VectorStore = Depends(get_vector_store),
-):
+) -> Payslip:
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés.")
 
@@ -37,14 +39,17 @@ async def upload_payslip(
     session.commit()
     session.refresh(payslip)
 
-    # Indexation vectorielle pour le RAG, après avoir obtenu l'ID en base
+    # Indexation vectorielle pour le RAG, après avoir obtenu l'ID en base.
+    # session.refresh() a peuplé la clé primaire auto-incrémentée : l'Optional
+    # du modèle SQLModel n'est plus possible ici.
+    assert payslip.id is not None
     vector_store.index(payslip.id, payslip.mois_annee, raw_text)
 
     return payslip
 
 
 @router.get("/payslips")
-def list_payslips(session: Session = Depends(get_session)):
+def list_payslips(session: Session = Depends(get_session)) -> Sequence[Payslip]:
     from sqlmodel import select
 
     payslips = session.exec(select(Payslip).order_by(Payslip.mois_annee)).all()

@@ -13,7 +13,7 @@ the business logic.
 Only the two genuinely swappable dependencies are abstracted here (LLM
 provider, vector store) -- see CONVENTIONS.md, "Dependency Inversion".
 """
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.models.payslip import PayslipExtraction
 
@@ -31,5 +31,5 @@ class VectorStore(Protocol):
     def index(self, payslip_id: int, mois_annee: str, raw_text: str) -> None:
         ...
 
-    def search(self, query: str, n_results: int = 3) -> list[dict]:
+    def search(self, query: str, n_results: int = 3) -> list[dict[str, Any]]:
         ...

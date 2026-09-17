@@ -4,7 +4,7 @@ fonctions ne passe par le LLM : le LLM choisit QUELS calculs faire
 (operation, champ, période), mais l'exécution est du Pandas pur.
 """
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 import pandas as pd
 from sqlmodel import Session, select
@@ -42,7 +42,7 @@ def run_analytics_query(
     operation: Operation,
     champ: str,
     derniers_n_mois: int | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Exécute un calcul exact sur les bulletins stockés.
 
     Args:
