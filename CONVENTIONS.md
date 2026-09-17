@@ -53,14 +53,14 @@ signatures) and depend on those instead of concrete classes:
 
 ```python
 # app/interfaces.py
-from typing import Protocol
+from typing import Any, Protocol
 
 class Extractor(Protocol):
     def extract(self, raw_text: str) -> PayslipExtraction: ...
 
 class VectorStore(Protocol):
     def index(self, payslip_id: int, mois_annee: str, raw_text: str) -> None: ...
-    def search(self, query: str, n_results: int = 3) -> list[dict]: ...
+    def search(self, query: str, n_results: int = 3) -> list[dict[str, Any]]: ...
 ```
 
 `extraction.py`'s current function becomes a class implementing `Extractor`;
@@ -74,6 +74,53 @@ another provider, or ChromaDB for FAISS/Pinecone, becomes a one-file change
 instead of a hunt through the codebase. Don't do this speculatively for every
 class — apply it specifically where you'd realistically want to swap an
 implementation (LLM provider, vector store), not everywhere.
+
+---
+
+## Static type checking
+
+The `Protocol`-based interfaces above are only as good as their enforcement.
+`mypy --strict` is how that enforcement actually happens — a `Protocol`
+nobody type-checks against is just a comment.
+
+**Run it locally:**
+
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements-dev.txt   # installs mypy on top of requirements.txt
+mypy --strict app/
+```
+
+A GitHub Actions workflow (`.github/workflows/mypy.yml`) runs the same
+command on every push/PR touching `backend/`, so a type error fails CI
+instead of surfacing later.
+
+**`requirements-dev.txt`, separate from `requirements.txt`.** The
+`Dockerfile` installs `requirements.txt` straight into the runtime image
+(`COPY requirements.txt . && pip install -r requirements.txt`). A type
+checker and its stub packages have no business shipping to production, so
+`requirements-dev.txt` starts with `-r requirements.txt` (single source of
+truth for the real dependencies) and adds `mypy` and `pandas-stubs` on top —
+only installed in dev and in CI.
+
+**The `pydantic.mypy` plugin (`backend/mypy.ini`) is required, not
+optional.** `langchain-anthropic`'s `ChatAnthropic` declares several
+constructor fields with a Pydantic `alias`, e.g.
+`model: str = Field(alias="model_name")`. Without the plugin, mypy
+synthesises `__init__` from the *aliases* and rejects the normal
+`ChatAnthropic(model=..., temperature=...)` call sites used throughout this
+codebase (`Unexpected keyword argument "model"`, plus spurious "missing
+argument" errors for other aliased, defaulted fields). The plugin teaches
+mypy about Pydantic's own `populate_by_name` behavior, so the constructor
+call sites can stay exactly as `langchain-anthropic`'s own docs write them.
+
+```ini
+# backend/mypy.ini
+[mypy]
+python_version = 3.12
+plugins = pydantic.mypy
+```
 
 ---
 
