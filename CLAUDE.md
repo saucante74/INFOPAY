@@ -101,6 +101,11 @@ migration standards). Key points to always respect:
 - **Markdown files** (README, this file, future docs) are written in English
   going forward.
 
+## Git commits
+
+Never add a "Co-Authored-By: Claude" line, "Generated with Claude Code" 
+signature, or any mention of AI assistance to commit messages. Commits 
+are authored solely by the user.
 
 ## Workflow
 
