@@ -187,53 +187,133 @@ scalar values).
 
 ---
 
-## TypeScript best practices (for the upcoming JS → TS migration)
+## TypeScript (frontend)
 
-Plan: a dedicated `feature/typescript-migration` branch, converting file by
-file (`.jsx` → `.tsx`, `.js` → `.ts`), not a big-bang rewrite.
+The migration is **done** — `frontend/` is TypeScript end to end, on the
+`feat/migrate-ts` branch. This section records the setup that actually
+shipped, so the next person changes it deliberately rather than by accident.
 
 ### Non-negotiables
 
-- **`"strict": true`** in `tsconfig.json` from day one. Migrating into a
-  non-strict config and tightening later is more work than starting strict.
-- **No `any`.** Where the type is genuinely unknown (e.g. a caught error),
-  use `unknown` and narrow with a type guard, not `any`.
-- **Type every component's props** with an explicit `interface` or `type`,
-  never implicit/inferred-from-usage props.
+- **`"strict": true`** from day one. Migrating into a permissive config and
+  tightening later is more work than starting strict.
+- **No `any`**, explicit or implicit. Where the type is genuinely unknown
+  (a caught error, a library value), use `unknown` and narrow with a type
+  guard.
+- **Type every component's props** with an explicit `interface`, never
+  inferred-from-usage.
+- **No `as` to silence the compiler.** If an assertion is genuinely the only
+  option, comment *why* — the same rule the backend applies to its `cast()`
+  calls under `mypy --strict`. The current frontend has none.
 
-### High-value patterns for this specific codebase
-
-**1. Generate types from the backend automatically, don't hand-write them
-twice.** FastAPI auto-generates an OpenAPI schema at
-`http://localhost:8000/openapi.json`. Use `openapi-typescript` to generate a
-`Payslip` type directly from the Pydantic schema:
+### Commands
 
 ```bash
-npm install -D openapi-typescript
-npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.ts
+cd frontend
+npm run dev          # Vite dev server
+npm run build        # tsc -b && vite build — type errors fail the build
+npm run typecheck    # tsc -b on its own
+npm run lint         # ESLint (flat config, type-aware)
+npm run format       # Prettier --write
+npm run format:check # Prettier --check, for CI
 ```
 
-This keeps frontend and backend types in sync automatically — a strong
-signal of engineering maturity to mention in an interview ("the frontend
-types are generated from the backend schema, not duplicated by hand").
+### tsconfig layout
 
-**2. Discriminated unions instead of multiple booleans for UI state.**
-`UploadZone.jsx` currently tracks `status` as a loose string
-(`null | "uploading" | "error"`) plus a separate `errorMessage` string. In
-TypeScript, model this as a proper discriminated union:
+Three files, the current Vite convention: `tsconfig.json` is a solution file
+holding only references, `tsconfig.app.json` covers `src/` (DOM libs,
+`jsx: react-jsx`), `tsconfig.node.json` covers `vite.config.ts` (Node types,
+no DOM). Splitting them is what lets the app code be checked against browser
+globals while the build config is checked against Node's, instead of one
+config that has to be permissive enough for both.
+
+On top of `strict`, these are enabled because `strict` does **not** turn them
+on and each has caught something real:
+
+| Option | Why |
+|---|---|
+| `noUncheckedIndexedAccess` | `files[0]` is `File \| undefined`, which is the truth — this is what forces `handleFile` to accept `undefined` |
+| `noUnusedLocals` / `noUnusedParameters` | dead imports after a refactor |
+| `noImplicitReturns` | a branch that forgets to return |
+| `erasableSyntaxOnly` | keeps the source free of enums/namespaces, which a bundler-only pipeline can't strip |
+| `verbatimModuleSyntax` | forces `import type` for type-only imports, so nothing type-only survives into the bundle |
+
+`exactOptionalPropertyTypes` is deliberately **not** enabled: it mostly
+distinguishes `{a: undefined}` from `{}`, which interacts badly with React's
+optional props for little benefit here.
+
+### ESLint
+
+Flat config (`eslint.config.js`), built directly on
+`@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` rather than
+the `typescript-eslint` meta-package's `config()` helper — the same call the
+backend makes with its hand-written LangGraph graph: keep the wiring visible
+instead of behind a prebuilt abstraction.
+
+**Type-aware linting is on** (`parserOptions.projectService: true`). This is
+the part that matters: without type information the `no-unsafe-*` rules are
+inert, and an `any` arriving from an untyped dependency passes silently. With
+it, `strict-type-checked` + `stylistic-type-checked` catch unsafe
+assignments, unsafe member access, floating promises and misused promises.
+
+ESLint **replaced oxlint** (removed in the same commit). oxlint's two rules
+are ported: `react/rules-of-hooks` → `eslint-plugin-react-hooks`,
+`react/only-export-components` → `eslint-plugin-react-refresh`. Two linters
+for one job means two places to configure and two answers to "is this
+allowed".
+
+`src/api/schema.ts` is in `ignores` — it's generated, not ours to lint.
+
+### Prettier
+
+`.prettierrc.json`: 100 columns, double quotes, semicolons, `es5` trailing
+commas — chosen to match the style `src/` already used, so the migration
+diff stayed readable instead of turning into a reformat of every line. No
+`eslint-config-prettier`: modern `typescript-eslint` ships no formatting
+rules, so there is nothing to turn off.
+
+### Regenerating the API types
+
+```bash
+# with the backend running current code:
+cd backend && source venv/bin/activate && uvicorn app.main:app --port 8000
+cd frontend && npm run generate:api-types
+```
+
+`src/api/schema.ts` is generated by `openapi-typescript`; **never edit it by
+hand**. `src/api/types.ts` is the thin layer on top, aliasing `Payslip`,
+`ChatResponse` etc. so components import a name instead of indexing into
+`components["schemas"][...]`.
+
+**The generated types are only as good as the backend's return
+annotations.** FastAPI derives a response schema from the route's return
+type, so `-> Payslip` / `-> Sequence[Payslip]` on the routers is what makes
+`openapi.json` carry a real `Payslip` component. Before those annotations
+were added (during the `mypy --strict` pass) every response was
+`"schema": {}` and generation produced nothing useful. If `schema.ts` comes
+back empty-looking, check the router's return annotation first — and make
+sure the backend you generated from is running the *current* code, not a
+stale container.
+
+### Patterns worth keeping
+
+**1. Discriminated unions for multi-case UI state.** `UploadZone`'s old
+`status` string plus a separate `errorMessage` became:
 
 ```typescript
 type UploadState =
   | { status: "idle" }
   | { status: "uploading" }
-  | { status: "error"; message: string }
-  | { status: "success"; payslip: Payslip };
+  | { status: "error"; message: string };
 ```
 
-This makes invalid states (e.g. `status: "error"` with no message)
-unrepresentable — the compiler catches it, not a runtime bug.
+"Error with no message" and "uploading while a stale message is still shown"
+are now unrepresentable. Note there is no `success` variant: the uploaded
+payslip goes straight to the parent via `onUploaded`, so a `success` state
+would hold a second copy of state nobody reads. Add variants the component
+actually distinguishes, not the ones the pattern suggests.
 
-**3. Type the API client's return values**, not just its parameters:
+**2. Typed API client return values**, not just parameters:
 
 ```typescript
 export async function fetchPayslips(): Promise<Payslip[]> {
@@ -242,17 +322,66 @@ export async function fetchPayslips(): Promise<Payslip[]> {
 }
 ```
 
-**4. `satisfies` operator (TS 4.9+)** for object literals that should be
-checked against a type without widening it — useful for the `SUGGESTIONS`
-array or similar constant config objects.
+**3. `satisfies` for constant config.** It checks without widening, so the
+literal keeps its exact type:
 
-### Tooling
+```typescript
+const COLUMNS = [
+  { key: "mois_annee", label: "Mois" },
+  // ...
+] as const satisfies readonly { key: keyof Payslip; label: string }[];
+```
 
-- ESLint with `@typescript-eslint`, Prettier for formatting — set up once at
-  the start of the migration branch, not retrofitted after.
-- Keep `.jsx` and `.tsx` files both buildable during the migration (Vite
-  handles this natively) so the branch stays shippable at every commit,
-  rather than one giant unreviewable diff.
+Tying `key` to `keyof Payslip` means a renamed backend field breaks the build
+here after the next regeneration — the frontend half of the guarantee
+CLAUDE.md asks for under "Field names". A plain `: readonly {...}[]`
+annotation would widen every `key` to `string` and lose that; an `as`
+assertion would check nothing at all.
+
+**4. Close the `import.meta.env` hole.** Vite's own `ImportMetaEnv` has an
+`[key: string]: any` index signature, so `import.meta.env.VITE_API_URL` is
+`any` — an implicit `any` arriving through a dependency rather than through
+your own code. Declaring the variable in `src/vite-env.d.ts` makes the named
+property win:
+
+```typescript
+interface ImportMetaEnv {
+  readonly VITE_API_URL?: string;
+}
+```
+
+Every new `VITE_*` variable belongs there.
+
+**5. `void` for deliberately un-awaited handlers.** Type-aware linting flags
+a floating promise in `onClick={() => send(s)}`. The fix is to mark the
+intent, not to silence the rule:
+
+```tsx
+onClick={() => {
+  void send(s);
+}}
+```
+
+**6. The backend's error body is a union, and needs narrowing.** FastAPI
+sends `{"detail": "<string>"}` for `HTTPException`s raised by our routers but
+`{"detail": [ValidationError, ...]}` for its own request-validation failures.
+The generated schema only knows the second shape. `getApiErrorMessage()` in
+`api/client.ts` narrows with `typeof detail === "string"` and keeps axios out
+of the components.
+
+**7. `||` and `??` are not interchangeable.** `import.meta.env.VITE_API_URL
+|| "http://localhost:8000"` intentionally keeps `||`: `VITE_API_URL=` in a
+.env file yields `""`, which should fall back too. `??` would only guard
+`undefined` and leave the app with an empty baseURL. The
+`prefer-nullish-coalescing` rule is disabled on that one line with that
+reason written next to it.
+
+### Version pinning gotcha
+
+TypeScript is pinned to `~5.9`, not the latest. `@typescript-eslint` 8.x
+requires `typescript >=4.8.4 <6.1.0` and `openapi-typescript` wants `^5.x`;
+installing TypeScript 7 satisfies neither and silently breaks type-aware
+linting. Revisit when typescript-eslint supports 7.x.
 
 ---
 

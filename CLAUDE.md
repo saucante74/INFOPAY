@@ -20,7 +20,8 @@ architectural decision in this codebase — preserve it in any change.
 
 - **Backend**: Python 3.12 (not 3.14 — see Known issues), FastAPI, SQLModel/SQLite,
   Pandas, ChromaDB, LangChain, LangGraph, Claude API (`langchain-anthropic`)
-- **Frontend**: React 19 + Vite, Tailwind v4, Recharts, lucide-react, axios
+- **Frontend**: React 19 + **TypeScript** (strict) + Vite, Tailwind v4, Recharts,
+  lucide-react, axios; ESLint (flat config, type-aware) + Prettier
 - **Infra**: Docker Compose (backend + frontend services)
 
 ## Commands
@@ -35,7 +36,18 @@ uvicorn app.main:app --reload --port 8000
 Frontend:
 ```bash
 cd frontend
-npm run dev
+npm run dev          # dev server
+npm run build        # tsc -b && vite build — type errors fail the build
+npm run typecheck    # tsc -b on its own
+npm run lint         # ESLint (type-aware)
+npm run format       # Prettier --write  (format:check for CI)
+```
+
+Regenerate the frontend's API types after any change to a backend route's
+request/response shape — they are generated from the live OpenAPI schema,
+not hand-written (backend must be running current code):
+```bash
+cd frontend && npm run generate:api-types   # -> src/api/schema.ts
 ```
 
 Full stack:
@@ -48,9 +60,16 @@ Verify backend syntax/imports without running the server:
 cd backend && python3 -m py_compile app/**/*.py
 ```
 
-There is currently no automated test suite. When adding one, prefer pytest
-for the backend (FastAPI's `TestClient`) and Vitest + React Testing Library
-for the frontend. Ask before choosing a different framework.
+Backend tests (pytest, see `backend/tests/`):
+```bash
+cd backend && source venv/bin/activate
+pytest tests/                                     # full suite
+pytest tests/ --cov=app --cov-report=term-missing  # with coverage
+mypy --strict app/                                 # type check
+```
+
+The frontend has **no** test suite yet. When adding one, prefer Vitest +
+React Testing Library. Ask before choosing a different framework.
 
 ## Conventions
 
@@ -93,7 +112,8 @@ migration standards). Key points to always respect:
 - Before committing generated files (zips, build artifacts, IDE folders like
   `.idea/`), check `.gitignore` covers them. If not, extend `.gitignore`
   rather than committing and cleaning up after.
-- **TypeScript migration**: happens on a dedicated `feature/typescript-migration`
-  branch, file by file (see `CONVENTIONS.md`), not a big-bang rewrite. Don't
-  start converting `.jsx` files unless explicitly asked to work on that
-  branch.
+- **TypeScript migration: done.** `frontend/` is TypeScript end to end
+  (branch `feat/migrate-ts`); there are no `.jsx`/`.js` files left under
+  `frontend/src/`. New frontend files are `.ts`/`.tsx`, with explicit props
+  interfaces and no `any` — see `CONVENTIONS.md`, "TypeScript (frontend)",
+  which documents the tsconfig/ESLint choices and the patterns to follow.

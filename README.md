@@ -37,6 +37,23 @@ npm run dev
 Open `http://localhost:5173`. The frontend expects the backend to be running
 on port 8000 (locally or via Docker).
 
+The frontend is **TypeScript** (strict). Useful commands:
+
+```bash
+npm run build        # tsc -b && vite build — type errors fail the build
+npm run typecheck    # tsc -b on its own
+npm run lint         # ESLint (flat config, type-aware)
+npm run format       # Prettier --write  (npm run format:check to verify)
+```
+
+`src/api/schema.ts` is **generated** from the backend's OpenAPI schema — the
+`Payslip` type is never hand-written twice. Regenerate it whenever a backend
+route's request/response shape changes, with the backend running:
+
+```bash
+npm run generate:api-types
+```
+
 Tailwind v4 is configured via `@theme` directly in `src/index.css` (no
 separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 
@@ -48,7 +65,9 @@ separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 - Pandas analytics engine (sum/average/min/max over the last N months)
 - 2-node LangGraph graph (agent + tools) routed via Claude tool-calling
 - `/api/upload`, `/api/payslips`, `/api/chat` endpoints
-- React frontend: drag & drop upload, summary table, evolution chart, chat
+- React + TypeScript frontend (strict, no `any`): drag & drop upload,
+  summary table, evolution chart, chat — with API types generated from the
+  backend's OpenAPI schema
 - Docker Compose for both services
 
 ## Docker
