@@ -1,9 +1,9 @@
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypedDict, cast
 
 from langchain_core.tools import tool
 
 from app.dependencies import get_vector_store
-from app.services.analytics import Operation, run_analytics_query
+from app.services.analytics import AnalyticsResult, Operation, run_analytics_query
 
 
 @tool
@@ -11,7 +11,7 @@ def query_analytics(
     operation: str,
     champ: str,
     derniers_n_mois: Optional[int] = None,
-) -> dict[str, Any]:
+) -> AnalyticsResult:
     """Calcule une valeur EXACTE (somme, moyenne, min, max) sur les bulletins
     de paie déjà importés par l'utilisateur. Utilise CET outil dès que la
     question porte sur un total, une moyenne, une évolution chiffrée ou une
@@ -34,8 +34,16 @@ def query_analytics(
     )
 
 
+class SearchKnowledgeResult(TypedDict):
+    """Forme renvoyée par `search_payslip_knowledge_tool` : une seule clé
+    connue, `extraits_trouves`. Son contenu reste `list[dict[str, Any]]` à
+    dessein — voir le commentaire dans le corps de la fonction."""
+
+    extraits_trouves: list[dict[str, Any]]
+
+
 @tool
-def search_payslip_knowledge_tool(query: str) -> dict[str, Any]:
+def search_payslip_knowledge_tool(query: str) -> SearchKnowledgeResult:
     """Recherche dans le texte brut des bulletins de paie pour EXPLIQUER
     une notion, une ligne de paie ou un terme technique (ex: 'à quoi
     correspond la sécurité sociale déplafonnée', 'qu'est-ce que le CSG').
@@ -48,6 +56,15 @@ def search_payslip_knowledge_tool(query: str) -> dict[str, Any]:
     # Résolu à l'appel, pas à l'import : le tool dépend du Protocol
     # VectorStore, pas de ChromaDB. La signature exposée au LLM reste
     # inchangée (aucun paramètre d'infrastructure ne doit y apparaître).
+    #
+    # `hits` reste `list[dict[str, Any]]` : c'est exactement le type de
+    # retour du Protocol `VectorStore.search()` (app/interfaces.py), qui est
+    # délibérément large pour rester substituable (Chroma aujourd'hui,
+    # FAISS/Pinecone demain — voir CONVENTIONS.md, "Dependency Inversion").
+    # Figer ici la forme des hits sur les clés actuelles de ChromaVectorStore
+    # («text», «mois_annee») coupleraient le Protocol à une implémentation
+    # précise. On ne type donc que ce qu'on connaît réellement à cette
+    # frontière : une seule clé de sortie, `extraits_trouves`.
     hits = get_vector_store().search(query)
     return {"extraits_trouves": hits}
 
