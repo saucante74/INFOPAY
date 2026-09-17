@@ -3,7 +3,7 @@ Schéma Pydantic utilisé pour :
 1. Forcer une sortie structurée du LLM lors de l'extraction (with_structured_output)
 2. Valider les données avant stockage en base
 """
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -54,4 +54,4 @@ class Payslip(SQLModel, table=True):
     prelevement_source: float
     raw_text: str = SQLField(description="Texte brut extrait du PDF, source pour le RAG")
     filename: str
-    created_at: datetime = SQLField(default_factory=datetime.utcnow)
+    created_at: datetime = SQLField(default_factory=lambda: datetime.now(UTC))
