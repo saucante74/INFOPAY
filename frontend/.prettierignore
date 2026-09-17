@@ -1,0 +1,7 @@
+dist
+node_modules
+package-lock.json
+
+# Generated from the backend's OpenAPI schema — reformatting it would create
+# noise on every regeneration.
+src/api/schema.ts
