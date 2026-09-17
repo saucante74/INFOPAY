@@ -98,6 +98,27 @@ Each backend workflow triggers on `push`/`pull_request` paths scoped to
 `backend/**`; each frontend workflow, to `frontend/**` (plus the workflow
 file itself, so editing a workflow re-runs it).
 
+## Git — absolutely no version control commands
+
+**NEVER run any command that stages, commits, pushes, or otherwise
+modifies the repository's history, index, or branch state.** This includes,
+but is not limited to:
+
+- `git add`, `git commit`, `git push`
+- `git checkout`, `git switch`, `git branch`
+- `git stash`, `git reset`, `git restore`
+- `git merge`, `git rebase`, `git cherry-pick`
+- `git tag`, `git filter-repo`, `git filter-branch`
+
+Version control is managed manually, by the user only.
+
+You MAY use read-only Git commands to understand the repository's current
+state: `git status`, `git diff`, `git log`, `git show`, `git blame`.
+
+Leave all changes in the working tree, unstaged. Do not ask whether to
+commit — simply stop after making the requested code changes and let the
+user handle staging and committing themselves.
+
 ## Conventions
 
 See `CONVENTIONS.md` for the full architecture and language-specific style
