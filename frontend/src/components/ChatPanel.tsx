@@ -1,25 +1,38 @@
-import { useRef, useState, useEffect } from "react";
-import { Send, Sparkles, Loader2 } from "lucide-react";
+import { Loader2, Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
 import { sendChatMessage } from "../api/client";
 
+/**
+ * `as const satisfies readonly string[]`: `satisfies` checks the contract
+ * without widening, so the array keeps its literal element types (useful if a
+ * suggestion is ever referenced by value) while still being rejected if a
+ * non-string sneaks in. A plain `: readonly string[]` annotation would widen
+ * every entry to `string`; an `as` assertion would check nothing.
+ */
 const SUGGESTIONS = [
   "Quel est le total de mes cotisations retraite sur les 4 derniers mois ?",
   "Somme des cotisations sociales sur 6 mois",
   "Quelle est la moyenne de mon net à payer ?",
   "À quoi correspond la ligne Sécurité Sociale Déplafonnée ?",
-];
+] as const satisfies readonly string[];
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export default function ChatPanel() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const send = async (text) => {
+  const send = async (text: string): Promise<void> => {
     const content = text.trim();
     if (!content || isLoading) return;
 
@@ -35,7 +48,8 @@ export default function ChatPanel() {
         ...prev,
         {
           role: "assistant",
-          content: "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
+          content:
+            "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
         },
       ]);
     } finally {
@@ -60,7 +74,9 @@ export default function ChatPanel() {
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
-                onClick={() => send(s)}
+                onClick={() => {
+                  void send(s);
+                }}
                 className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-ink-soft transition-colors hover:border-accent hover:text-ink"
               >
                 {s}
@@ -96,13 +112,15 @@ export default function ChatPanel() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          send(input);
+          void send(input);
         }}
         className="flex items-center gap-2 border-t border-border p-3"
       >
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+          }}
           placeholder="Posez une question sur vos bulletins…"
           className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
         />

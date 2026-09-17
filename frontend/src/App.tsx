@@ -1,21 +1,13 @@
-import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
-import { fetchPayslips } from "./api/client";
-import UploadZone from "./components/UploadZone";
-import PayslipTable from "./components/PayslipTable";
-import PayslipChart from "./components/PayslipChart";
+
 import ChatPanel from "./components/ChatPanel";
+import PayslipChart from "./components/PayslipChart";
+import PayslipTable from "./components/PayslipTable";
+import UploadZone from "./components/UploadZone";
+import { usePayslips } from "./hooks/usePayslips";
 
 export default function App() {
-  const [payslips, setPayslips] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchPayslips()
-      .then(setPayslips)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { payslips, isLoading, addPayslip } = usePayslips();
 
   return (
     <div className="mx-auto flex h-screen max-w-7xl flex-col gap-4 p-4">
@@ -27,7 +19,7 @@ export default function App() {
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-4 overflow-y-auto pr-1">
-          <UploadZone onUploaded={(p) => setPayslips((prev) => [...prev, p])} />
+          <UploadZone onUploaded={addPayslip} />
 
           {!isLoading && (
             <>

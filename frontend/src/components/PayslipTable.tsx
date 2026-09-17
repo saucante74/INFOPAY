@@ -1,6 +1,15 @@
-const formatEuros = (value) =>
+import type { Payslip } from "../api/types";
+
+const formatEuros = (value: number): string =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(value);
 
+/**
+ * `satisfies` rather than a type annotation: the literal keeps its exact
+ * shape (so `COLUMNS` stays a readonly tuple of literal strings) while still
+ * being checked against the contract below. A `key` that no longer exists on
+ * `Payslip` — after a backend field rename plus a `npm run generate:api-types`
+ * — is a compile error here, which is the point.
+ */
 const COLUMNS = [
   { key: "mois_annee", label: "Mois" },
   { key: "salaire_brut", label: "Brut" },
@@ -8,9 +17,13 @@ const COLUMNS = [
   { key: "total_cotisations_salariales", label: "Cotis. salariales" },
   { key: "cotisations_retraite", label: "Retraite" },
   { key: "prelevement_source", label: "Prélèvement source" },
-];
+] as const satisfies readonly { key: keyof Payslip; label: string }[];
 
-export default function PayslipTable({ payslips }) {
+interface PayslipTableProps {
+  payslips: readonly Payslip[];
+}
+
+export default function PayslipTable({ payslips }: PayslipTableProps) {
   if (payslips.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-surface-raised px-6 py-10 text-center text-sm text-ink-soft">
