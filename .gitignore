@@ -21,4 +21,4 @@ frontend/.env
 # Général
 .DS_Store
 *.log
-*.md
+*.md.mcp.json
