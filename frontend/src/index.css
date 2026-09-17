@@ -3,6 +3,11 @@
 @theme {
   --font-sans: "Inter", system-ui, sans-serif;
 
+  /* Light values (the default). Tailwind's generated utilities (bg-ink,
+     text-accent, etc.) all resolve through var(--color-*), so overriding
+     these custom properties later in the cascade — see the dark-mode block
+     below — is enough to retheme every utility that uses them. No parallel
+     "dark:" utility set needed. */
   --color-ink: #111827;
   --color-ink-soft: #4b5563;
   --color-surface: #f7f8fa;
@@ -22,4 +27,52 @@ body {
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Dark mode. Three-layer cascade, in this order:
+ *
+ *   1. :root (above)                        — light defaults.
+ *   2. @media (prefers-color-scheme: dark),
+ *      guarded by :not([data-theme="light"]) — system preference, unless
+ *                                               the user has explicitly
+ *                                               forced light.
+ *   3. :root[data-theme="dark"]              — explicit user override,
+ *                                               regardless of the system.
+ *
+ * No :root[data-theme="light"] block exists, on purpose: forcing light only
+ * has to make rule 2 stop matching, which its own :not() guard already
+ * does — the :root defaults from rule 1 take over unchanged. Forcing dark
+ * is the only case that needs its own rule, since it must apply even when
+ * the system is light (where rule 2 never fires at all).
+ *
+ * `data-theme` is set on <html> by useTheme() (src/hooks/useTheme.ts) only
+ * once the user has made an explicit choice; absent, the page is 100%
+ * CSS-driven — no JS has to run for the system-preference case to render
+ * correctly, including on the very first paint.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-ink: #e8eaed;
+    --color-ink-soft: #9aa1ac;
+    --color-surface: #0f1115;
+    --color-surface-raised: #1b1f26;
+    --color-border: #2c313b;
+    --color-accent: #0f766e;
+    --color-accent-soft: #134e4a;
+    --color-alert: #fbbf24;
+    --color-alert-soft: #78350f;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-ink: #e8eaed;
+  --color-ink-soft: #9aa1ac;
+  --color-surface: #0f1115;
+  --color-surface-raised: #1b1f26;
+  --color-border: #2c313b;
+  --color-accent: #0f766e;
+  --color-accent-soft: #134e4a;
+  --color-alert: #fbbf24;
+  --color-alert-soft: #78350f;
 }

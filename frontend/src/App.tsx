@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 import ChatPanel from "./components/ChatPanel";
 import PayslipChart from "./components/PayslipChart";
 import PayslipTable from "./components/PayslipTable";
+import ThemeToggle from "./components/ThemeToggle";
 import UploadZone from "./components/UploadZone";
 import { usePayslips } from "./hooks/usePayslips";
 
@@ -15,6 +16,9 @@ export default function App() {
         <FileText className="h-5 w-5 text-accent" />
         <h1 className="text-lg font-semibold">InfoPay AI</h1>
         <span className="text-sm text-ink-soft">— Assistant & Analytics de fiches de paie</span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[1fr_380px]">
