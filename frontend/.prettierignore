@@ -1,6 +1,7 @@
 dist
 node_modules
 package-lock.json
+coverage
 
 # Generated from the backend's OpenAPI schema — reformatting it would create
 # noise on every regeneration.

@@ -15,7 +15,7 @@ export default [
   {
     // Generated from the backend's OpenAPI schema — not ours to lint.
     // Regenerate with `npm run generate:api-types` (see CONVENTIONS.md).
-    ignores: ["dist/**", "src/api/schema.ts"],
+    ignores: ["dist/**", "coverage/**", "src/api/schema.ts"],
   },
 
   js.configs.recommended,
