@@ -21,3 +21,4 @@ frontend/.env
 # Général
 .DS_Store
 *.log
+*.md

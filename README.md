@@ -1,75 +1,88 @@
-# InfoPay AI — Backend scaffold
+# InfoPay AI — Payslip Analytics & Assistant
 
-## Structure
+A hybrid analytics + RAG assistant for payslips: upload PDF payslips, get exact
+multi-month calculations (via Pandas), and ask natural-language questions
+about payslip line items (via a vector search RAG pipeline on ChromaDB).
 
-```
-backend/
-  app/
-    models/payslip.py      # Schéma Pydantic (extraction) + table SQLModel
-    services/
-      extraction.py        # PDF -> texte (pdfplumber) -> extraction LLM structurée
-      vectorstore.py        # ChromaDB : indexation + recherche RAG
-      analytics.py          # Calculs exacts (Pandas) sur les bulletins stockés
-    agent/
-      tools.py              # 2 tools LangChain exposés au LLM
-      graph.py               # Graphe LangGraph (agent <-> tools)
-    routers/
-      upload.py              # POST /api/upload, GET /api/payslips
-      chat.py                 # POST /api/chat
-    main.py                   # App FastAPI, CORS, montage des routers
-    db.py                      # Connexion SQLite / SQLModel
-  requirements.txt
-  .env.example
-```
-
-## Démarrage (jour 1)
+## Backend setup
 
 ```bash
 cd backend
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# éditer .env et coller votre clé ANTHROPIC_API_KEY
+# edit .env and paste your ANTHROPIC_API_KEY
 
 uvicorn app.main:app --reload --port 8000
 ```
 
-Vérifier que ça tourne : http://localhost:8000/api/health doit renvoyer `{"status": "ok"}`.
-Doc interactive auto-générée : http://localhost:8000/docs — pratique pour tester
-`/api/upload` (avec un vrai PDF) et `/api/chat` sans attendre le frontend.
+Health check: `http://localhost:8000/api/health` should return `{"status": "ok"}`.
+Interactive docs: `http://localhost:8000/docs` — useful to test `/api/upload`
+(with a real PDF) and `/api/chat` without waiting on the frontend.
 
-## Ce qui est déjà fonctionnel
+> Requires Python 3.12. ChromaDB does not currently support Python 3.14
+> (native dependency build failures) — see the note at the bottom.
 
-- Schéma Pydantic complet (les 8 champs demandés)
-- Pipeline d'extraction PDF -> LLM structuré (gère les formats de bulletins variés)
-- Indexation vectorielle ChromaDB (embedding local, pas d'API externe nécessaire pour ça)
-- Moteur analytique Pandas (somme/moyenne/min/max sur N derniers mois)
-- Graphe LangGraph à 2 nœuds (agent + tools) avec routage par tool-calling Claude
-- Endpoints `/api/upload`, `/api/payslips`, `/api/chat`
+## Frontend setup
 
-## Ce qu'il reste à faire
+```bash
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_URL, defaults to http://localhost:8000
+npm run dev
+```
 
-1. **Tester avec de vrais PDF** de bulletins de paie (formats différents si possible)
-   pour valider l'extraction — c'est le point le plus fragile, à tester en premier.
-2. **Frontend React (Vite)** — pas encore généré. Étapes :
-   ```bash
-   npm create vite@latest frontend -- --template react
-   cd frontend
-   npm install
-   npm install -D tailwindcss postcss autoprefixer
-   npm install lucide-react recharts axios
-   ```
-3. Ajuster le prompt d'extraction (`extraction.py`) si certains champs sont
-   mal extraits sur vos formats de bulletins réels.
+Open `http://localhost:5173`. The frontend expects the backend to be running
+on port 8000 (locally or via Docker).
 
-## Points à savoir avant de lancer
+Tailwind v4 is configured via `@theme` directly in `src/index.css` (no
+separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 
-- `chromadb` et `langchain`/`langgraph` sont des dépendances assez lourdes à
-  installer (plusieurs dizaines de Mo) — la première installation peut prendre
-  quelques minutes.
-- Le modèle utilisé partout est `claude-sonnet-4-6` (variable `EXTRACTION_MODEL`
-  dans `extraction.py` et `CHAT_MODEL` dans `graph.py`) — changez-le si besoin.
-- La base ChromaDB est stockée dans `./chroma_data/` et SQLite dans `./infopay.db`,
-  tous deux créés automatiquement au premier lancement (ajoutez-les à `.gitignore`).
+## What's already working
+
+- Full Pydantic extraction schema (all 8 required fields)
+- PDF -> LLM structured extraction pipeline (handles varied payslip layouts)
+- ChromaDB vector indexing (local embeddings, no external API needed for that)
+- Pandas analytics engine (sum/average/min/max over the last N months)
+- 2-node LangGraph graph (agent + tools) routed via Claude tool-calling
+- `/api/upload`, `/api/payslips`, `/api/chat` endpoints
+- React frontend: drag & drop upload, summary table, evolution chart, chat
+- Docker Compose for both services
+
+## Docker
+
+```bash
+# From the project root
+cp backend/.env.example backend/.env   # then paste your API key
+docker compose up --build
+```
+
+The first build takes a few minutes (langchain, langgraph, chromadb are heavy
+dependencies). Data (SQLite + ChromaDB) is persisted on the host in
+`backend/data/`, so it survives container rebuilds and restarts.
+
+Backend: `http://localhost:8000/api/health`
+Frontend: `http://localhost:5173`
+
+## What's left to do
+
+1. **Test with real payslip PDFs** (varied formats if possible) to validate
+   extraction — this is the most fragile part, test it first.
+2. Adjust the extraction prompt (`extraction.py`) if some fields are
+   misextracted on your real payslip formats.
+3. The frontend bundle has a size warning (~650 kB, due to Recharts) — not
+   blocking for a demo, can be optimized later with dynamic `import()`
+   code-splitting.
+
+## Notes
+
+- Model used throughout: `claude-sonnet-4-6` (`EXTRACTION_MODEL` in
+  `extraction.py`, `CHAT_MODEL` in `graph.py`) — change if needed.
+- ChromaDB and langchain/langgraph are heavy dependencies (tens of MB) — first
+  install can take a few minutes.
+- **Python 3.14 compatibility**: ChromaDB currently fails to build on Python
+  3.14 (missing wheels for a native dependency, plus an internal Pydantic v1
+  compatibility bug). Use Python 3.12 for this project until upstream fixes
+  land.
