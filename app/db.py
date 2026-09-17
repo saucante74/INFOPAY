@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Session, create_engine
 
-DATABASE_URL = "sqlite:///./infopay.db"
+DATABASE_URL = "sqlite:///./data/infopay.db"
 
 # check_same_thread=False : nécessaire car FastAPI peut appeler depuis
 # différents threads (workers async)

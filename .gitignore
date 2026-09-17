@@ -4,3 +4,17 @@ __pycache__/
 .env
 infopay.db
 chroma_data/
+
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+backend/data/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+.DS_Store
+*.log
