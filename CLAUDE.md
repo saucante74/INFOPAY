@@ -21,7 +21,8 @@ architectural decision in this codebase — preserve it in any change.
 - **Backend**: Python 3.12 (not 3.14 — see Known issues), FastAPI, SQLModel/SQLite,
   Pandas, ChromaDB, LangChain, LangGraph, Claude API (`langchain-anthropic`)
 - **Frontend**: React 19 + **TypeScript** (strict) + Vite, Tailwind v4, Recharts,
-  lucide-react, axios; ESLint (flat config, type-aware) + Prettier
+  lucide-react, axios; ESLint (flat config, type-aware) + Prettier; Vitest +
+  React Testing Library for tests
 - **Infra**: Docker Compose (backend + frontend services)
 
 ## Commands
@@ -68,8 +69,34 @@ pytest tests/ --cov=app --cov-report=term-missing  # with coverage
 mypy --strict app/                                 # type check
 ```
 
-The frontend has **no** test suite yet. When adding one, prefer Vitest +
-React Testing Library. Ask before choosing a different framework.
+Frontend tests (Vitest + React Testing Library, see `frontend/src/**/*.test.{ts,tsx}`):
+```bash
+cd frontend
+npm run test              # full suite, non-watch (CI mode)
+npm run test:watch        # watch mode, for local development
+npm run test:coverage     # with coverage
+```
+
+Tests are colocated with the file they cover
+(`UploadZone.tsx` + `UploadZone.test.tsx` in the same directory) — see
+`CONVENTIONS.md`, "Testing (frontend)", for the convention and the mocking
+strategy (API client mocked at the module boundary, no real network calls).
+
+### CI workflows (`.github/workflows/`)
+
+One workflow per responsibility — don't add a new check by growing an
+existing file's job list unless it's genuinely the same responsibility:
+
+| File | Checks |
+|---|---|
+| `mypy.yml` | backend: `mypy --strict app/` |
+| `api-tests.yml` | backend: `pytest` (with coverage) |
+| `frontend-checks.yml` | frontend: `tsc -b && vite build`, `eslint .`, `prettier --check` |
+| `frontend-tests.yml` | frontend: `npm run test` (Vitest, non-watch) |
+
+Each backend workflow triggers on `push`/`pull_request` paths scoped to
+`backend/**`; each frontend workflow, to `frontend/**` (plus the workflow
+file itself, so editing a workflow re-runs it).
 
 ## Conventions
 

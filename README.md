@@ -87,10 +87,13 @@ Frontend: `http://localhost:5173`
 
 ## Running tests
 
-Backend only for now (see "What's left to do"). Tests never call the real
-Anthropic API or touch the real database/ChromaDB in `backend/data/` — the
-LLM, vector store and DB session are all replaced with fakes/an in-memory
-SQLite DB (see `backend/tests/conftest.py`).
+Tests never call the real Anthropic API or touch real data — no real
+network calls, no writes to `backend/data/`.
+
+### Backend
+
+The LLM, vector store and DB session are all replaced with fakes/an
+in-memory SQLite DB (see `backend/tests/conftest.py`).
 
 ```bash
 cd backend
@@ -104,8 +107,29 @@ pytest tests/ -v                                    # verbose (per-test pass/fai
 pytest tests/ --cov=app --cov-report=term-missing    # with coverage
 ```
 
-Also run `mypy --strict app/` before committing — both `mypy` and `pytest`
-run in CI on every push/PR touching `backend/` (`.github/workflows/`).
+Also run `mypy --strict app/` before committing.
+
+### Frontend
+
+The API client (`src/api/client.ts`) is mocked in every test — no test can
+reach a real backend. Tests are colocated with the file they cover
+(`UploadZone.tsx` + `UploadZone.test.tsx`).
+
+```bash
+cd frontend
+npm install   # vitest, @testing-library/react, jsdom...
+
+npm run test                                    # full suite, non-watch
+npm run test -- src/components/UploadZone.test.tsx   # one file
+npm run test:watch                              # watch mode, for local dev
+npm run test:coverage                           # with coverage
+```
+
+Also run `npm run build` and `npm run lint` before committing.
+
+Both backend and frontend suites run in CI on every push/PR touching their
+respective directory — see `.github/workflows/` (`mypy.yml`, `api-tests.yml`,
+`frontend-checks.yml`, `frontend-tests.yml`).
 
 ## What's left to do
 

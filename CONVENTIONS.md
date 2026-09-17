@@ -385,6 +385,97 @@ linting. Revisit when typescript-eslint supports 7.x.
 
 ---
 
+## Testing (frontend)
+
+Vitest + React Testing Library, as named in CLAUDE.md's original commands
+section. Config lives in `vitest.config.ts` — a separate file from
+`vite.config.ts` rather than a merged `test` key, for the same "one file, one
+responsibility" reason the CI workflows are split (see below): `vite build`
+shouldn't carry Vitest-only config around for no reason.
+
+### Where tests live
+
+Colocated with the file they cover: `UploadZone.tsx` + `UploadZone.test.tsx`
+in the same directory, not a separate `__tests__/` or top-level `tests/`
+tree. This is Vitest's own convention (its default `include` glob matches
+files anywhere, colocated or not, but colocated is what the ecosystem
+actually does and what the docs show), and it keeps a test next to what it
+verifies — a rename or a move takes the test with it. Shared, non-test
+utilities (`src/test/setup.ts`, `src/test/fixtures.ts`, `src/test/helpers.ts`)
+live in `src/test/`, named so they don't match the `*.test.ts` glob
+themselves.
+
+### Environment: jsdom, not happy-dom
+
+`jsdom` was chosen over the faster `happy-dom` for one concrete reason:
+`UploadZone`'s drag-and-drop tests need a working `DataTransfer`/`files`
+simulation via `fireEvent.drop(el, { dataTransfer: { files: [...] } })`,
+and jsdom's DOM event/File API coverage is the more complete, better-tested
+one of the two for exactly this kind of interaction. Revisit if test suite
+startup time becomes a real problem — it isn't at 28 tests.
+
+### Mocking strategy
+
+- **The API client (`src/api/client.ts`) is mocked wholesale**
+  (`vi.mock("../api/client")`) in every component/hook test. Components
+  don't know or care that axios exists; they call `uploadPayslip()`,
+  `fetchPayslips()`, `sendChatMessage()` and react to what resolves or
+  rejects. No test outside `client.test.ts` itself knows the HTTP client is
+  axios.
+- **`client.test.ts` mocks `axios` itself** (`vi.mock("axios")`, with
+  `axios.create()` returning a fake instance whose `get`/`post` are
+  `vi.fn()`s created via `vi.hoisted()`). This is the one file allowed to
+  know the transport is axios, since it's testing that layer specifically.
+- **No test reaches a real network socket or a real backend.** Verified,
+  not just intended — see RAPPORT.md's verification section for how this
+  was checked.
+
+### Gotchas found (fixed in `src/test/setup.ts` unless noted)
+
+- **`Element.prototype.scrollTo` doesn't exist in jsdom**
+  ([jsdom#1695](https://github.com/jsdom/jsdom/issues/1695)) — `ChatPanel`
+  calls it to auto-scroll the message list, so every render without a stub
+  throws. Stubbed as a no-op; there's no real layout to assert a scroll
+  position against in jsdom anyway.
+- **RTL's auto-cleanup needs a global `afterEach`.** `vitest.config.ts` sets
+  `globals: false` (test files import `describe`/`it`/`expect`/`afterEach`
+  explicitly, consistent with `verbatimModuleSyntax` forbidding implicit
+  anything elsewhere in this codebase) — but React Testing Library's
+  automatic unmount-after-each-test registration relies on detecting
+  Vitest's *global* `afterEach`. With globals off, it silently never
+  attaches, and DOM from one test leaks into the next. Fixed by importing
+  `cleanup` and calling it in an explicit `afterEach` in the setup file.
+- **Recharts never mounts under jsdom.** `ResponsiveContainer` measures its
+  container with a real `ResizeObserver`
+  (`typeof ResizeObserver === 'undefined'` guards the whole measurement
+  path in its source) and jsdom implements no `ResizeObserver` at all — so
+  `PayslipChart`'s axis, lines and tooltip never render in any test.
+  Deliberately **not** polyfilled: that would test Recharts' own
+  measurement/rendering pipeline, not the one conditional branch that's
+  actually this codebase's code
+  (`payslips.length < 2` ? placeholder : chart). `PayslipChart.test.tsx`
+  asserts on that branch and on the presence/absence of the
+  `.recharts-responsive-container` wrapper, nothing past it.
+- **`userEvent.upload()` enforces the target `<input accept>`.** It won't
+  attach a file whose type doesn't match `accept="application/pdf"` — this
+  simulates a real OS file picker filtering its own list, so the component's
+  own `file?.type !== "application/pdf"` guard never fires through it.
+  Tests that need to exercise that guard use `fireEvent.drop(...)` instead,
+  which is also the more realistic path: drag-and-drop bypasses any picker
+  filtering entirely, which is exactly why the component still needs its
+  own check.
+- **RTL's default text normalizer breaks locale-formatted currency
+  matches.** It collapses whitespace runs in the *DOM's* text to a single
+  ASCII space before comparing, but does not apply that same
+  normalization to a string matcher you pass in — so querying for
+  `formatEuros(3000)` (whose narrow no-break space, U+202F, is real fr-FR
+  formatting) silently fails to match text that's already been collapsed.
+  Fixed locally in `PayslipTable.test.tsx` with `{ normalizer: (t) => t }`
+  to compare both sides as the exact same bytes, rather than fighting the
+  normalizer or hand-typing a Unicode space character into a test file.
+
+---
+
 ## What NOT to over-engineer
 
 Given the one-week timeline, apply the DIP refactor (Protocol interfaces) and
