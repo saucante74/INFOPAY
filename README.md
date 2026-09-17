@@ -66,6 +66,28 @@ dependencies). Data (SQLite + ChromaDB) is persisted on the host in
 Backend: `http://localhost:8000/api/health`
 Frontend: `http://localhost:5173`
 
+## Running tests
+
+Backend only for now (see "What's left to do"). Tests never call the real
+Anthropic API or touch the real database/ChromaDB in `backend/data/` — the
+LLM, vector store and DB session are all replaced with fakes/an in-memory
+SQLite DB (see `backend/tests/conftest.py`).
+
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements-dev.txt   # pytest, pytest-mock, pytest-cov, mypy...
+
+pytest tests/                                      # full suite
+pytest tests/unit/test_analytics.py                # one file
+pytest tests/unit/test_analytics.py::test_somme     # one test
+pytest tests/ -v                                    # verbose (per-test pass/fail)
+pytest tests/ --cov=app --cov-report=term-missing    # with coverage
+```
+
+Also run `mypy --strict app/` before committing — both `mypy` and `pytest`
+run in CI on every push/PR touching `backend/` (`.github/workflows/`).
+
 ## What's left to do
 
 1. **Test with real payslip PDFs** (varied formats if possible) to validate

@@ -86,3 +86,22 @@ def test_payslip_row_accepts_extraction_model_dump():
     assert payslip.mois_annee == "03/2025"
     assert payslip.net_a_payer == 2300.0
     assert payslip.id is None  # pas encore persisté
+
+
+def test_payslip_created_at_defaults_to_now_and_survives_a_db_round_trip(test_engine):
+    from sqlmodel import Session
+
+    extraction = PayslipExtraction(**_valid_kwargs())
+    payslip = Payslip(**extraction.model_dump(), raw_text="texte brut", filename="bulletin.pdf")
+    assert payslip.created_at.tzinfo is not None  # aware juste après construction
+
+    with Session(test_engine) as session:
+        session.add(payslip)
+        session.commit()
+        session.refresh(payslip)
+        assert payslip.created_at.tzinfo is None  # naïf après le premier refresh
+
+    with Session(test_engine) as session:
+        reloaded = session.get(Payslip, payslip.id)
+        assert reloaded is not None
+        assert reloaded.created_at.tzinfo is None  # naïf après un rechargement frais

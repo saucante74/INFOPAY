@@ -1,17 +1,17 @@
-name: tests
+name: api-tests
 
 on:
   push:
     paths:
       - "backend/**"
-      - ".github/workflows/tests.yml"
+      - ".github/workflows/api-tests.yml"
   pull_request:
     paths:
       - "backend/**"
-      - ".github/workflows/tests.yml"
+      - ".github/workflows/api-tests.yml"
 
 jobs:
-  pytest:
+  api-tests:
     runs-on: ubuntu-latest
     defaults:
       run:
