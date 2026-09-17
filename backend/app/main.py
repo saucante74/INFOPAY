@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +10,14 @@ load_dotenv()
 from app.db import init_db
 from app.routers import chat, upload
 
-app = FastAPI(title="InfoPay AI")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    yield
+
+
+app = FastAPI(title="InfoPay AI", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,11 +25,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
 
 
 app.include_router(upload.router)

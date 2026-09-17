@@ -37,6 +37,23 @@ npm run dev
 Open `http://localhost:5173`. The frontend expects the backend to be running
 on port 8000 (locally or via Docker).
 
+The frontend is **TypeScript** (strict). Useful commands:
+
+```bash
+npm run build        # tsc -b && vite build — type errors fail the build
+npm run typecheck    # tsc -b on its own
+npm run lint         # ESLint (flat config, type-aware)
+npm run format       # Prettier --write  (npm run format:check to verify)
+```
+
+`src/api/schema.ts` is **generated** from the backend's OpenAPI schema — the
+`Payslip` type is never hand-written twice. Regenerate it whenever a backend
+route's request/response shape changes, with the backend running:
+
+```bash
+npm run generate:api-types
+```
+
 Tailwind v4 is configured via `@theme` directly in `src/index.css` (no
 separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 
@@ -48,7 +65,9 @@ separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 - Pandas analytics engine (sum/average/min/max over the last N months)
 - 2-node LangGraph graph (agent + tools) routed via Claude tool-calling
 - `/api/upload`, `/api/payslips`, `/api/chat` endpoints
-- React frontend: drag & drop upload, summary table, evolution chart, chat
+- React + TypeScript frontend (strict, no `any`): drag & drop upload,
+  summary table, evolution chart, chat — with API types generated from the
+  backend's OpenAPI schema
 - Docker Compose for both services
 
 ## Docker
@@ -68,10 +87,13 @@ Frontend: `http://localhost:5173`
 
 ## Running tests
 
-Backend only for now (see "What's left to do"). Tests never call the real
-Anthropic API or touch the real database/ChromaDB in `backend/data/` — the
-LLM, vector store and DB session are all replaced with fakes/an in-memory
-SQLite DB (see `backend/tests/conftest.py`).
+Tests never call the real Anthropic API or touch real data — no real
+network calls, no writes to `backend/data/`.
+
+### Backend
+
+The LLM, vector store and DB session are all replaced with fakes/an
+in-memory SQLite DB (see `backend/tests/conftest.py`).
 
 ```bash
 cd backend
@@ -85,8 +107,29 @@ pytest tests/ -v                                    # verbose (per-test pass/fai
 pytest tests/ --cov=app --cov-report=term-missing    # with coverage
 ```
 
-Also run `mypy --strict app/` before committing — both `mypy` and `pytest`
-run in CI on every push/PR touching `backend/` (`.github/workflows/`).
+Also run `mypy --strict app/` before committing.
+
+### Frontend
+
+The API client (`src/api/client.ts`) is mocked in every test — no test can
+reach a real backend. Tests are colocated with the file they cover
+(`UploadZone.tsx` + `UploadZone.test.tsx`).
+
+```bash
+cd frontend
+npm install   # vitest, @testing-library/react, jsdom...
+
+npm run test                                    # full suite, non-watch
+npm run test -- src/components/UploadZone.test.tsx   # one file
+npm run test:watch                              # watch mode, for local dev
+npm run test:coverage                           # with coverage
+```
+
+Also run `npm run build` and `npm run lint` before committing.
+
+Both backend and frontend suites run in CI on every push/PR touching their
+respective directory — see `.github/workflows/` (`mypy.yml`, `api-tests.yml`,
+`frontend-checks.yml`, `frontend-tests.yml`).
 
 ## What's left to do
 
