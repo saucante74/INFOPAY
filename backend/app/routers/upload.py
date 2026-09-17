@@ -1,16 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Session
 
+from app.agent.interfaces import Extractor, VectorStore
 from app.db import get_session
+from app.dependencies import get_extractor, get_vector_store
 from app.models.payslip import Payslip
-from app.services.extraction import extract_structured_data, extract_text_from_pdf
-from app.services.vectorstore import index_payslip
+from app.services.extraction import extract_text_from_pdf
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 
 @router.post("/upload")
-async def upload_payslip(file: UploadFile, session: Session = Depends(get_session)):
+async def upload_payslip(
+    file: UploadFile,
+    session: Session = Depends(get_session),
+    extractor: Extractor = Depends(get_extractor),
+    vector_store: VectorStore = Depends(get_vector_store),
+):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés.")
 
@@ -18,7 +24,7 @@ async def upload_payslip(file: UploadFile, session: Session = Depends(get_sessio
 
     raw_text = extract_text_from_pdf(file_bytes)
     try:
-        extracted = extract_structured_data(raw_text)
+        extracted = extractor.extract(raw_text)
     except Exception as exc:  # extraction LLM ou parsing PDF échoués
         raise HTTPException(status_code=422, detail=f"Extraction impossible: {exc}") from exc
 
@@ -32,7 +38,7 @@ async def upload_payslip(file: UploadFile, session: Session = Depends(get_sessio
     session.refresh(payslip)
 
     # Indexation vectorielle pour le RAG, après avoir obtenu l'ID en base
-    index_payslip(payslip.id, payslip.mois_annee, raw_text)
+    vector_store.index(payslip.id, payslip.mois_annee, raw_text)
 
     return payslip
 

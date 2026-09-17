@@ -2,8 +2,8 @@ from typing import Optional
 
 from langchain_core.tools import tool
 
+from app.dependencies import get_vector_store
 from app.services.analytics import run_analytics_query
-from app.services.vectorstore import search_payslip_knowledge
 
 
 @tool
@@ -40,7 +40,10 @@ def search_payslip_knowledge_tool(query: str) -> dict:
     Args:
         query: la question ou le terme à rechercher.
     """
-    hits = search_payslip_knowledge(query)
+    # Résolu à l'appel, pas à l'import : le tool dépend du Protocol
+    # VectorStore, pas de ChromaDB. La signature exposée au LLM reste
+    # inchangée (aucun paramètre d'infrastructure ne doit y apparaître).
+    hits = get_vector_store().search(query)
     return {"extraits_trouves": hits}
 
 
