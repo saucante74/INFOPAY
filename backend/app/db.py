@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from sqlmodel import SQLModel, Session, create_engine
 
 DATABASE_URL = "sqlite:///./data/infopay.db"
@@ -14,6 +16,6 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 
 
-def get_session():
+def get_session() -> Iterator[Session]:
     with Session(engine) as session:
         yield session

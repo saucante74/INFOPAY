@@ -1,0 +1,17 @@
+# Dev-only tooling. Kept out of requirements.txt on purpose: the Dockerfile
+# installs requirements.txt into the runtime image, and type-checking /
+# testing tools have no business shipping to production.
+#
+#   pip install -r requirements-dev.txt
+#   mypy --strict app/
+#   pytest --cov=app --cov-report=term-missing
+
+-r requirements.txt
+
+mypy==1.13.0
+pandas-stubs==2.2.3.241009
+
+pytest==8.3.5
+pytest-mock==3.14.0
+pytest-cov==6.0.0
+httpx==0.28.1

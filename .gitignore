@@ -12,6 +12,8 @@ backend/**/__pycache__/
 backend/*.pyc
 backend/.env
 backend/data/
+backend/.pytest_cache/
+backend/.coverage
 
 # Frontend Node (une fois généré)
 frontend/node_modules/
@@ -21,3 +23,5 @@ frontend/.env
 # Général
 .DS_Store
 *.log
+*.md
+.mcp.json
