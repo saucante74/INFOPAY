@@ -4,7 +4,7 @@ fonctions ne passe par le LLM : le LLM choisit QUELS calculs faire
 (operation, champ, période), mais l'exécution est du Pandas pur.
 """
 from datetime import datetime
-from typing import Literal
+from typing import Literal, TypedDict
 
 import pandas as pd
 from sqlmodel import Session, select
@@ -25,6 +25,27 @@ FIELD_MAP = {
 Operation = Literal["somme", "moyenne", "min", "max"]
 
 
+class AnalyticsSuccess(TypedDict):
+    """Forme renvoyée quand le calcul a pu être exécuté."""
+
+    operation: Operation
+    champ: str
+    periode: str
+    resultat: float
+
+
+class AnalyticsError(TypedDict):
+    """Forme renvoyée quand la requête est invalide ou ne peut aboutir
+    (champ inconnu, opération inconnue, aucun bulletin importé)."""
+
+    error: str
+
+
+# Union à deux formes fixes plutôt que `dict[str, Any]` : le LLM et les
+# appelants savent exactement à quoi s'attendre, succès ou erreur.
+AnalyticsResult = AnalyticsSuccess | AnalyticsError
+
+
 def _load_dataframe() -> pd.DataFrame:
     with Session(engine) as session:
         payslips = session.exec(select(Payslip)).all()
@@ -42,7 +63,7 @@ def run_analytics_query(
     operation: Operation,
     champ: str,
     derniers_n_mois: int | None = None,
-) -> dict:
+) -> AnalyticsResult:
     """Exécute un calcul exact sur les bulletins stockés.
 
     Args:

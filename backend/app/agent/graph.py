@@ -23,7 +23,7 @@ explicable :
 - Le nœud "tools" exécute les tools appelés et renvoie les résultats
   au modèle, qui reformule alors une réponse finale en langage naturel.
 """
-from typing import Annotated, TypedDict
+from typing import Annotated, TypedDict, cast
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AnyMessage, SystemMessage
@@ -58,7 +58,7 @@ _llm = ChatAnthropic(model=CHAT_MODEL, temperature=0).bind_tools(TOOLS)
 def _call_model(state: AgentState) -> AgentState:
     messages = [SYSTEM_PROMPT, *state["messages"]]
     response = _llm.invoke(messages)
-    return {"messages": [response]}
+    return {"messages": [cast(AnyMessage, response)]}
 
 
 def _should_continue(state: AgentState) -> str:
@@ -87,4 +87,6 @@ def run_chat(user_message: str, history: list[AnyMessage] | None = None) -> str:
     messages = (history or []) + [HumanMessage(content=user_message)]
     result = agent_graph.invoke({"messages": messages})
     final_message = result["messages"][-1]
-    return final_message.content
+    # BaseMessage.content est `str | list[...]` ; nos réponses finales, sans
+    # tool_call, sont toujours du texte.
+    return cast(str, final_message.content)
