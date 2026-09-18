@@ -2,6 +2,7 @@ import { Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
+import { requireAuth } from "../auth/authModal";
 
 /**
  * `as const satisfies readonly string[]`: `satisfies` checks the contract
@@ -32,10 +33,7 @@ export default function ChatPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const send = async (text: string): Promise<void> => {
-    const content = text.trim();
-    if (!content || isLoading) return;
-
+  const performSend = async (content: string): Promise<void> => {
     setMessages((prev) => [...prev, { role: "user", content }]);
     setInput("");
     setIsLoading(true);
@@ -59,6 +57,20 @@ export default function ChatPanel() {
     }
   };
 
+  // Logged in: `requireAuth` calls `performSend` immediately — identical to
+  // the previous behaviour, including the input clearing and the user's
+  // bubble appearing synchronously. Logged out: the shared login modal
+  // opens and `performSend(content)` resumes once login succeeds, with the
+  // exact text the user typed (captured by the closure) — nothing is added
+  // to the chat, and the input isn't cleared, until it actually sends.
+  const send = (text: string): void => {
+    const content = text.trim();
+    if (!content || isLoading) return;
+    requireAuth(() => {
+      void performSend(content);
+    });
+  };
+
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-surface-raised">
       <div className="border-b border-border px-4 py-3">
@@ -77,7 +89,7 @@ export default function ChatPanel() {
               <button
                 key={s}
                 onClick={() => {
-                  void send(s);
+                  send(s);
                 }}
                 className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-ink-soft transition-colors hover:border-accent hover:text-ink"
               >
@@ -114,7 +126,7 @@ export default function ChatPanel() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void send(input);
+          send(input);
         }}
         className="flex items-center gap-2 border-t border-border p-3"
       >

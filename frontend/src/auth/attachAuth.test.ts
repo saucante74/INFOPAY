@@ -3,11 +3,20 @@
  * replaces the HTTP transport, so nothing leaves the process, but the
  * interceptor chain is axios's own.
  */
+import { renderHook } from "@testing-library/react";
 import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { attachAuth } from "./attachAuth";
+import { closeAuthModal, useAuthModalState } from "./authModal";
 import { getToken, setToken } from "./tokenStore";
+
+// `authModal`'s open/closed state is a plain module-level variable, not
+// reset by localStorage clearing — done explicitly so no test starts with
+// a stray open modal left by the previous one.
+afterEach(() => {
+  closeAuthModal();
+});
 
 function instanceRespondingWith(status: number) {
   const sent: InternalAxiosRequestConfig[] = [];
@@ -42,19 +51,28 @@ describe("attachAuth", () => {
     expect(sent[0]?.headers.has("Authorization")).toBe(false);
   });
 
-  it("clears the token on a 401 and still rejects to the caller", async () => {
+  it("clears the token on a 401, opens the shared login modal, and still rejects to the caller", async () => {
     setToken("expired.token.value");
+    const { result } = renderHook(() => useAuthModalState());
     const { api } = instanceRespondingWith(401);
 
     await expect(api.get("/api/payslips")).rejects.toBeInstanceOf(AxiosError);
+
     expect(getToken()).toBeNull();
+    expect(result.current.isOpen).toBe(true);
   });
 
-  it.each([403, 429, 500])("keeps the token on a %i", async (status) => {
-    setToken("valid.token.value");
-    const { api } = instanceRespondingWith(status);
+  it.each([403, 429, 500])(
+    "keeps the token, and doesn't open the modal, on a %i",
+    async (status) => {
+      setToken("valid.token.value");
+      const { result } = renderHook(() => useAuthModalState());
+      const { api } = instanceRespondingWith(status);
 
-    await expect(api.get("/api/chat")).rejects.toBeInstanceOf(AxiosError);
-    expect(getToken()).toBe("valid.token.value");
-  });
+      await expect(api.get("/api/chat")).rejects.toBeInstanceOf(AxiosError);
+
+      expect(getToken()).toBe("valid.token.value");
+      expect(result.current.isOpen).toBe(false);
+    }
+  );
 });

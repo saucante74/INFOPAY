@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import LoginModal from "../auth/LoginModal";
 import { getToken, setToken } from "../auth/tokenStore";
 import { renderWithRouter } from "../test/helpers";
 import Navbar from "./Navbar";
@@ -43,20 +44,28 @@ describe("Navbar", () => {
     expect(screen.getByRole("navigation", { name: "Navigation principale" })).toBeInTheDocument();
   });
 
-  it("shows no logout button when logged out", () => {
+  it("shows 'Se connecter', not 'Se déconnecter', when logged out", () => {
     renderWithRouter(<Navbar />);
     expect(screen.queryByRole("button", { name: "Se déconnecter" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
   });
 
-  it("logs out and goes to /login from the logout button", async () => {
+  it("shows 'Se déconnecter', not 'Se connecter', when logged in", () => {
+    setToken("jwt.token.value");
+    renderWithRouter(<Navbar />);
+    expect(screen.getByRole("button", { name: "Se déconnecter" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Se connecter" })).not.toBeInTheDocument();
+  });
+
+  it("logs out without navigating anywhere — '/' is public, there's nowhere it needs to send you", async () => {
     const user = userEvent.setup();
     setToken("jwt.token.value");
     renderWithRouter(
       <>
         <Navbar />
         <Routes>
+          <Route path="/aide" element={<p>Page Aide</p>} />
           <Route path="/login" element={<p>Page de connexion</p>} />
-          <Route path="*" element={null} />
         </Routes>
       </>,
       "/aide"
@@ -65,7 +74,24 @@ describe("Navbar", () => {
     await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
 
     expect(getToken()).toBeNull();
-    expect(screen.getByText("Page de connexion")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Se déconnecter" })).not.toBeInTheDocument();
+    expect(screen.getByText("Page Aide")).toBeInTheDocument();
+    expect(screen.queryByText("Page de connexion")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
+  });
+
+  it("opens the shared login modal from 'Se connecter', in place, without navigating", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(
+      <>
+        <Navbar />
+        <LoginModal />
+      </>
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Se connecter" }));
+
+    expect(screen.getByRole("dialog", { name: "Connexion" })).toBeInTheDocument();
   });
 });

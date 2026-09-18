@@ -1,6 +1,5 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 
-import RequireAuth from "./auth/RequireAuth";
 import RootLayout from "./layouts/RootLayout";
 import AnalyzerPage from "./pages/AnalyzerPage";
 import HelpPage from "./pages/HelpPage";
@@ -16,23 +15,17 @@ import TermsPage from "./pages/TermsPage";
  * hand-written ESLint flat config — the route tree should read like a route
  * tree, not be reconstructed from a data structure.
  *
- * Only the analyzer requires a login: it's the only page calling the API.
- * Help and the legal pages stay public (the privacy policy should be
- * readable before anyone signs in).
+ * "/" is public — it shows the analyzer shell (upload zone, empty
+ * chart/table, chat) to anyone. Login is only required per-action (upload,
+ * chat), via the shared modal `requireAuth()` opens — see `auth/authModal.ts`
+ * and RAPPORT.md. No route here is gated by a redirect anymore.
  */
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route element={<RootLayout />}>
-          <Route
-            index
-            element={
-              <RequireAuth>
-                <AnalyzerPage />
-              </RequireAuth>
-            }
-          />
+          <Route index element={<AnalyzerPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="aide" element={<HelpPage />} />
           <Route path="confidentialite" element={<PrivacyPage />} />

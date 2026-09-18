@@ -1,6 +1,7 @@
-import { LogOut } from "lucide-react";
-import { NavLink, useNavigate } from "react-router";
+import { LogIn, LogOut } from "lucide-react";
+import { NavLink } from "react-router";
 
+import { requireAuth } from "../auth/authModal";
 import { clearToken, useAuthToken } from "../auth/tokenStore";
 import ThemeToggle from "./ThemeToggle";
 
@@ -20,7 +21,6 @@ function navLinkClassName({ isActive }: { isActive: boolean }): string {
 
 export default function Navbar() {
   const token = useAuthToken();
-  const navigate = useNavigate();
 
   return (
     <header className="border-b border-border bg-surface-raised">
@@ -51,18 +51,31 @@ export default function Navbar() {
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {token && (
+          {/* No navigation either way: logging out no longer sends you
+              anywhere (there's nowhere it needs to — "/" is public), and
+              "Se connecter" opens the shared modal in place rather than a
+              route change, so whatever page you were reading stays put. */}
+          {token ? (
             <button
               type="button"
-              onClick={() => {
-                clearToken();
-                void navigate("/login");
-              }}
+              onClick={clearToken}
               aria-label="Se déconnecter"
               title="Se déconnecter"
               className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-ink"
             >
               <LogOut className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                requireAuth();
+              }}
+              aria-label="Se connecter"
+              title="Se connecter"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-ink"
+            >
+              <LogIn className="h-4 w-4" />
             </button>
           )}
         </div>

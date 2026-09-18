@@ -13,12 +13,25 @@ vi.mock("../api/client", () => ({
   formatRetryDelay: vi.fn(),
 }));
 
+// Default: run the action immediately, as `requireAuth` does when already
+// logged in — every existing test below exercises that path, unchanged
+// from before this mock existed. The one test that cares about the gated
+// (logged-out) path overrides this per-test — see "requires login before
+// uploading".
+vi.mock("../auth/authModal", () => ({
+  requireAuth: vi.fn((action?: () => void) => {
+    action?.();
+  }),
+}));
+
 import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
+import { requireAuth } from "../auth/authModal";
 
 const mockUploadPayslip = vi.mocked(uploadPayslip);
 const mockGetApiErrorMessage = vi.mocked(getApiErrorMessage);
 const mockGetRateLimit = vi.mocked(getRateLimit);
 const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
+const mockRequireAuth = vi.mocked(requireAuth);
 
 const pdfFile = new File(["contenu"], "bulletin.pdf", { type: "application/pdf" });
 const txtFile = new File(["contenu"], "notes.txt", { type: "text/plain" });
@@ -53,6 +66,9 @@ beforeEach(() => {
   mockGetApiErrorMessage.mockReset();
   mockGetRateLimit.mockReset();
   mockFormatRetryDelay.mockReset();
+  mockRequireAuth.mockReset().mockImplementation((action?: () => void) => {
+    action?.();
+  });
 });
 
 describe("UploadZone", () => {
@@ -163,6 +179,53 @@ describe("UploadZone", () => {
     assertDefined(dropzone, "expected the drop zone <label> to be present");
 
     fireEvent.drop(dropzone, { dataTransfer: { files: [pdfFile] } });
+
+    await waitFor(() => {
+      expect(mockUploadPayslip).toHaveBeenCalledWith(pdfFile);
+    });
+    expect(onUploaded).toHaveBeenCalled();
+    // Every upload goes through the auth gate, even when (as here, and in
+    // every test above) it turns out to already be satisfied.
+    expect(mockRequireAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires login before uploading: does not call the API when logged out", async () => {
+    const user = userEvent.setup();
+    mockRequireAuth.mockImplementation(() => {
+      // Simulates "logged out": requireAuth opens the modal instead of
+      // running the action — verified here by simply *not* calling it.
+    });
+    render(<UploadZone onUploaded={vi.fn()} />);
+
+    await user.upload(getInput(), pdfFile);
+
+    expect(mockRequireAuth).toHaveBeenCalledTimes(1);
+    expect(mockUploadPayslip).not.toHaveBeenCalled();
+    // Still showing the idle prompt — no "uploading" state was ever
+    // entered, since the actual upload logic never ran.
+    expect(
+      screen.getByText(/Glissez un bulletin de paie \(PDF\) ici, ou cliquez pour parcourir/)
+    ).toBeInTheDocument();
+  });
+
+  it("resumes the exact file once login succeeds, without re-selecting it", async () => {
+    const user = userEvent.setup();
+    const onUploaded = vi.fn();
+    let resumeUpload: (() => void) | undefined;
+    mockRequireAuth.mockImplementation((action?: () => void) => {
+      resumeUpload = action;
+    });
+    mockUploadPayslip.mockResolvedValueOnce(makePayslip());
+    render(<UploadZone onUploaded={onUploaded} />);
+
+    await user.upload(getInput(), pdfFile);
+    expect(mockUploadPayslip).not.toHaveBeenCalled();
+
+    // The login modal isn't rendered by UploadZone itself (see
+    // App.test.tsx for the full, real modal flow) — this simulates
+    // exactly what it does on success: call the stashed action.
+    assertDefined(resumeUpload, "expected requireAuth to have been given an action to resume");
+    resumeUpload();
 
     await waitFor(() => {
       expect(mockUploadPayslip).toHaveBeenCalledWith(pdfFile);

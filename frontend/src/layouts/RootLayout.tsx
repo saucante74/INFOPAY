@@ -1,5 +1,6 @@
 import { Outlet } from "react-router";
 
+import LoginModal from "../auth/LoginModal";
 import Footer from "../components/Footer";
 import Navbar from "../components/Navbar";
 
@@ -8,6 +9,12 @@ import Navbar from "../components/Navbar";
  * `<Outlet />`, in the same `min-h-screen flex-col` sticky-footer shell
  * `App.tsx` used before routes existed (see RAPPORT.md, "Navbar + Footer")
  * — moved here so it applies to all pages, not just the analyzer.
+ *
+ * `LoginModal` mounted once here, not per-route: it's opened by
+ * `requireAuth()` from anywhere (Navbar, UploadZone, ChatPanel, a 401), and
+ * `RootLayout` is the one element react-router keeps mounted across every
+ * route change, so it's a stable place for it to live regardless of which
+ * page is showing underneath. It renders `null` while closed either way.
  */
 export default function RootLayout() {
   return (
@@ -19,6 +26,7 @@ export default function RootLayout() {
       </main>
 
       <Footer />
+      <LoginModal />
     </div>
   );
 }
