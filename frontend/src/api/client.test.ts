@@ -8,15 +8,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makePayslip } from "../test/fixtures";
 import type { ApiErrorBody } from "./types";
 
-const { mockGet, mockPost } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockRequestUse, mockResponseUse } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPost: vi.fn(),
+  mockRequestUse: vi.fn(),
+  mockResponseUse: vi.fn(),
 }));
 
 /** Minimal stand-in for the shape `axios.isAxiosError` narrows to. */
 interface FakeAxiosError {
   isAxiosError: true;
-  response?: { data?: ApiErrorBody };
+  response?: { status?: number; headers?: Record<string, string>; data?: ApiErrorBody };
 }
 
 function isFakeAxiosError(value: unknown): value is FakeAxiosError {
@@ -33,7 +35,11 @@ function isFakeAxiosError(value: unknown): value is FakeAxiosError {
 
 vi.mock("axios", () => ({
   default: {
-    create: vi.fn(() => ({ get: mockGet, post: mockPost })),
+    create: vi.fn(() => ({
+      get: mockGet,
+      post: mockPost,
+      interceptors: { request: { use: mockRequestUse }, response: { use: mockResponseUse } },
+    })),
     isAxiosError: isFakeAxiosError,
   },
 }));
@@ -41,7 +47,22 @@ vi.mock("axios", () => ({
 // `vi.mock` calls are hoisted above imports by Vitest, so this static import
 // already resolves against the faked axios — `api = axios.create(...)`
 // inside client.ts becomes `{ get: mockGet, post: mockPost }`.
-import { fetchPayslips, getApiErrorMessage, sendChatMessage, uploadPayslip } from "./client";
+import {
+  fetchPayslips,
+  formatRetryDelay,
+  getApiErrorMessage,
+  getRateLimit,
+  login,
+  sendChatMessage,
+  uploadPayslip,
+} from "./client";
+
+// Captured once, at import: client.ts wires the auth interceptors when the
+// module loads, before any `beforeEach` could reset these spies.
+const interceptorsRegisteredAtImport = {
+  request: mockRequestUse.mock.calls.length,
+  response: mockResponseUse.mock.calls.length,
+};
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -120,5 +141,62 @@ describe("getApiErrorMessage", () => {
     expect(getApiErrorMessage(new Error("boom"))).toBeUndefined();
     expect(getApiErrorMessage("a plain string")).toBeUndefined();
     expect(getApiErrorMessage(null)).toBeUndefined();
+  });
+});
+
+describe("auth wiring", () => {
+  it("registers the auth request and response interceptors on the shared instance", () => {
+    // Behaviour of those interceptors is covered in auth/attachAuth.test.ts.
+    expect(interceptorsRegisteredAtImport).toEqual({ request: 1, response: 1 });
+  });
+});
+
+describe("login", () => {
+  it("POSTs the credentials and returns only the access token", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { access_token: "jwt.token.value", token_type: "bearer", expires_in: 86400 },
+    });
+
+    await expect(login({ username: "admin", password: "secret" })).resolves.toBe("jwt.token.value");
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/login", {
+      username: "admin",
+      password: "secret",
+    });
+  });
+});
+
+describe("getRateLimit", () => {
+  function tooManyRequests(headers: Record<string, string>): FakeAxiosError {
+    return { isAxiosError: true, response: { status: 429, headers } };
+  }
+
+  it("converts Retry-After seconds into whole minutes, rounding up", () => {
+    expect(getRateLimit(tooManyRequests({ "retry-after": "600" }))).toEqual({
+      retryAfterMinutes: 10,
+    });
+    expect(getRateLimit(tooManyRequests({ "retry-after": "61" }))).toEqual({
+      retryAfterMinutes: 2,
+    });
+  });
+
+  it("still reports the limit when Retry-After is missing or unreadable", () => {
+    expect(getRateLimit(tooManyRequests({}))).toEqual({ retryAfterMinutes: null });
+    expect(getRateLimit(tooManyRequests({ "retry-after": "soon" }))).toEqual({
+      retryAfterMinutes: null,
+    });
+  });
+
+  it("returns null for any other failure", () => {
+    const serverError: FakeAxiosError = { isAxiosError: true, response: { status: 500 } };
+    expect(getRateLimit(serverError)).toBeNull();
+    expect(getRateLimit({ isAxiosError: true })).toBeNull();
+    expect(getRateLimit(new Error("boom"))).toBeNull();
+  });
+});
+
+describe("formatRetryDelay", () => {
+  it("gives the delay in minutes when known, a vaguer wording otherwise", () => {
+    expect(formatRetryDelay({ retryAfterMinutes: 12 })).toBe("dans 12 min");
+    expect(formatRetryDelay({ retryAfterMinutes: null })).toBe("plus tard");
   });
 });

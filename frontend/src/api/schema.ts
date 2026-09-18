@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/upload": {
         parameters: {
             query?: never;
@@ -38,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/payslips/{payslip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Payslip */
+        delete: operations["delete_payslip_api_payslips__payslip_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat": {
         parameters: {
             query?: never;
@@ -49,6 +83,23 @@ export interface paths {
         put?: never;
         /** Chat */
         post: operations["chat_api_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rate-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rate Limits */
+        get: operations["rate_limits_api_rate_limits_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -99,6 +150,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
         /**
          * Payslip
          * @description Table SQLite : version persistée d'un bulletin, avec le texte brut
@@ -109,6 +167,8 @@ export interface components {
             id?: number | null;
             /** Mois Annee */
             mois_annee: string;
+            /** Nom Entreprise */
+            nom_entreprise?: string | null;
             /** Salaire Brut */
             salaire_brut: number;
             /** Net Imposable */
@@ -136,6 +196,37 @@ export interface components {
              */
             created_at?: string;
         };
+        /** RateLimitStatus */
+        RateLimitStatus: {
+            /** Remaining */
+            remaining: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Reset At
+             * Format: date-time
+             */
+            reset_at: string;
+        };
+        /** RateLimitsResponse */
+        RateLimitsResponse: {
+            upload: components["schemas"]["RateLimitStatus"];
+            chat: components["schemas"]["RateLimitStatus"];
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             * @enum {string}
+             */
+            token_type: "bearer";
+            /** Expires In */
+            expires_in: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -154,6 +245,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login_api_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_payslip_api_upload_post: {
         parameters: {
             query?: never;
@@ -207,6 +331,35 @@ export interface operations {
             };
         };
     };
+    delete_payslip_api_payslips__payslip_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payslip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     chat_api_chat_post: {
         parameters: {
             query?: never;
@@ -236,6 +389,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_limits_api_rate_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateLimitsResponse"];
                 };
             };
         };

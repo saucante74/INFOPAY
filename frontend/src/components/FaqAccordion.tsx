@@ -45,9 +45,11 @@ const FAQ_ITEMS = [
       "Un échec affiche un message sous la zone d'import — le plus souvent parce que " +
       "le PDF est un scan sans texte, illisible ou n'est pas un bulletin de paie. " +
       "Vérifiez que le PDF s'ouvre normalement et que son texte est sélectionnable, " +
-      "puis réessayez. Si les valeurs extraites semblent incorrectes, il n'existe pas " +
-      "encore de fonction pour corriger ou supprimer un bulletin déjà importé — c'est " +
-      "une limite connue de cette version.",
+      "puis réessayez. Si les valeurs extraites semblent incorrectes, vous pouvez " +
+      "supprimer le bulletin depuis le tableau récapitulatif (icône de corbeille sur " +
+      "la ligne concernée) puis réimporter un PDF plus lisible — il n'existe en " +
+      "revanche pas encore de fonction pour corriger directement les valeurs d'un " +
+      "bulletin déjà importé.",
   },
   {
     question: "Mes bulletins de paie sont des données sensibles : sont-elles protégées ?",

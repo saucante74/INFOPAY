@@ -1,8 +1,10 @@
 import { FileUp, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { getApiErrorMessage, uploadPayslip } from "../api/client";
+import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
 import type { Payslip } from "../api/types";
+import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 /**
  * Discriminated union instead of the previous `status: null | "uploading" |
@@ -29,27 +31,49 @@ export default function UploadZone({ onUploaded }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [upload, setUpload] = useState<UploadState>({ status: "idle" });
 
-  const handleFile = useCallback(
-    async (file: File | undefined) => {
-      if (file?.type !== "application/pdf") {
-        setUpload({ status: "error", message: "Seuls les fichiers PDF sont acceptés." });
-        return;
-      }
+  const performUpload = useCallback(
+    async (file: File) => {
       setUpload({ status: "uploading" });
       try {
         const payslip = await uploadPayslip(file);
         setUpload({ status: "idle" });
         onUploaded(payslip);
+        // The request just succeeded, so it consumed exactly one hit of
+        // the `upload` scope's budget — see useRateLimits.ts for why this
+        // is a safe local update rather than a second network round trip.
+        decrementRateLimit("upload");
       } catch (error) {
+        const rateLimit = getRateLimit(error);
         setUpload({
           status: "error",
-          message:
-            getApiErrorMessage(error) ??
-            "L'extraction a échoué. Vérifiez que le PDF est bien un bulletin de paie lisible.",
+          message: rateLimit
+            ? `Limite d'imports atteinte pour cette heure. Réessayez ${formatRetryDelay(rateLimit)}.`
+            : (getApiErrorMessage(error) ??
+              "L'extraction a échoué. Vérifiez que le PDF est bien un bulletin de paie lisible."),
         });
       }
     },
     [onUploaded]
+  );
+
+  // The file-type check runs unconditionally — no need to log in just to be
+  // told a .txt file isn't accepted. Only the actual upload (the part that
+  // costs an Anthropic API call, per app/rate_limit.py) is gated: logged
+  // in, `requireAuth` runs `performUpload` immediately, byte-for-byte the
+  // previous behaviour; logged out, it opens the shared login modal and
+  // resumes with this exact `file` (captured by the closure) once login
+  // succeeds — no re-selecting the file needed.
+  const handleFile = useCallback(
+    (file: File | undefined) => {
+      if (file?.type !== "application/pdf") {
+        setUpload({ status: "error", message: "Seuls les fichiers PDF sont acceptés." });
+        return;
+      }
+      requireAuth(() => {
+        void performUpload(file);
+      });
+    },
+    [performUpload]
   );
 
   return (
@@ -65,10 +89,7 @@ export default function UploadZone({ onUploaded }: UploadZoneProps) {
         onDrop={(e) => {
           e.preventDefault();
           setIsDragging(false);
-          // `void`: the handler is deliberately fire-and-forget, exactly as
-          // before — the upload's outcome is reflected through `upload`
-          // state, not awaited by the DOM event.
-          void handleFile(e.dataTransfer.files[0]);
+          handleFile(e.dataTransfer.files[0]);
         }}
         className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors cursor-pointer ${
           isDragging
@@ -81,7 +102,7 @@ export default function UploadZone({ onUploaded }: UploadZoneProps) {
           accept="application/pdf"
           className="hidden"
           onChange={(e) => {
-            void handleFile(e.target.files?.[0]);
+            handleFile(e.target.files?.[0]);
           }}
         />
         {upload.status === "uploading" ? (

@@ -6,12 +6,12 @@ import { usePayslips } from "../hooks/usePayslips";
 
 /** The app's home route ("/") — unchanged content, previously inlined in `App.tsx`. */
 export default function AnalyzerPage() {
-  const { payslips, isLoading, addPayslip } = usePayslips();
+  const { payslips, isLoading, addPayslip, removePayslip } = usePayslips();
 
   return (
     <>
       <div>
-        <h1 className="text-2xl font-bold">Assistant & Analytics de fiches de paie</h1>
+        <h1 className="text-2xl font-bold">Assistant et analyse : Bulletin de salaire</h1>
         <p className="mt-1 text-sm text-ink-soft">
           Importez vos bulletins pour suivre leur évolution et poser vos questions à l'assistant.
         </p>
@@ -24,7 +24,7 @@ export default function AnalyzerPage() {
           {!isLoading && (
             <>
               <PayslipChart payslips={payslips} />
-              <PayslipTable payslips={payslips} />
+              <PayslipTable payslips={payslips} onDelete={removePayslip} />
             </>
           )}
         </div>

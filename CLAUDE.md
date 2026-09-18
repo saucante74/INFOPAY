@@ -19,10 +19,11 @@ architectural decision in this codebase — preserve it in any change.
 ## Stack
 
 - **Backend**: Python 3.12 (not 3.14 — see Known issues), FastAPI, SQLModel/SQLite,
-  Pandas, ChromaDB, LangChain, LangGraph, Claude API (`langchain-anthropic`)
+  Pandas, ChromaDB, LangChain, LangGraph, Claude API (`langchain-anthropic`);
+  PyJWT + bcrypt for auth
 - **Frontend**: React 19 + **TypeScript** (strict) + Vite, Tailwind v4, Recharts,
-  lucide-react, axios; ESLint (flat config, type-aware) + Prettier; Vitest +
-  React Testing Library for tests
+  lucide-react, axios, react-router; ESLint (flat config, type-aware) + Prettier;
+  Vitest + React Testing Library for tests
 - **Infra**: Docker Compose (backend + frontend services)
 
 ## Commands
@@ -97,6 +98,53 @@ existing file's job list unless it's genuinely the same responsibility:
 Each backend workflow triggers on `push`/`pull_request` paths scoped to
 `backend/**`; each frontend workflow, to `frontend/**` (plus the workflow
 file itself, so editing a workflow re-runs it).
+
+## Authentication and rate limiting
+
+A single account protects the whole API; see README.md, "Authentication",
+for the password-hash command and the `.env` variables (`ADMIN_USERNAME`,
+`ADMIN_PASSWORD_HASH`, `JWT_SECRET`, optional `JWT_EXPIRE_HOURS`,
+`RATE_LIMIT_PER_HOUR` and `LOGIN_RATE_LIMIT_PER_15MIN`). The backend
+**refuses to start** if they're missing or malformed, so any command that
+runs the app's lifespan (uvicorn, `generate:api-types` against a live
+server) needs them set. The test suite doesn't: it never triggers the
+lifespan.
+
+Rules to respect when changing the code:
+
+- **Auth stays isolated.** It lives in `backend/app/auth/` and
+  `frontend/src/auth/` (+ `pages/LoginPage.tsx`). Business routers,
+  services and components never import it. Protection is applied in
+  `app/main.py` via `include_router(..., dependencies=_authenticated)`, and
+  the token is attached by an axios interceptor (`attachAuth`).
+- **A new router is public unless you say otherwise.** When adding one in
+  `main.py`, pass `dependencies=_authenticated` unless it is deliberately
+  public like `/api/health` and `/api/auth/login`.
+- **Any new endpoint that calls the Anthropic API gets a rate limit**:
+  `dependencies=[Depends(RateLimit("<scope>"))]` on the route, from
+  `app/rate_limit.py`. The limiter is independent of auth on purpose.
+- **Login rate limiting is a different mechanism, on purpose.**
+  `app/auth/login_rate_limit.py`'s `LoginRateLimit` keys its counter by
+  `request.client.host` (one budget per IP), unlike `RateLimit`'s single
+  shared counter — a shared counter on `/api/auth/login` would let one
+  attacker lock out the real user. Don't reuse `RateLimit` for anything
+  that needs per-caller isolation; don't reuse `LoginRateLimit` for a
+  shared budget (it would just give every caller the same key's counter
+  by accident if you forgot to pass one).
+- **Passwords:** `bcrypt` directly, not passlib. passlib 1.7.4 crashes
+  with bcrypt >= 5, which chromadb already requires.
+- **Backend tests:** the `client` fixture bypasses auth and rate limiting,
+  so business tests stay about business logic. Use `auth_client` (real
+  `require_auth` and limiters, test settings) to test protection itself.
+  For a new rate-limited endpoint, add its limiter to both fixtures in
+  `tests/conftest.py`. Note: the pinned Starlette version's `TestClient`
+  can't vary `request.client` per instance, so per-IP behavior is tested
+  by calling `require_login_rate_limit()` directly with a hand-built
+  `Request` (see `tests/functional/test_auth.py`), not through a live
+  HTTP round trip.
+- **Frontend tests:** components that call the API handle `429` through
+  `getRateLimit()` from `api/client.ts`. Component tests mock the client,
+  so add new helpers to each `vi.mock("../api/client", ...)` factory.
 
 ## Git — absolutely no version control commands
 
