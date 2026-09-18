@@ -1,0 +1,34 @@
+/**
+ * Domain types, derived from the backend's OpenAPI schema rather than
+ * hand-written a second time on this side.
+ *
+ * `schema.ts` is generated (`npm run generate:api-types`) — never edit it.
+ * This file is the thin, readable layer on top: components import `Payslip`
+ * from here instead of reaching into `components["schemas"][...]`, so the
+ * generated file's shape stays an implementation detail.
+ *
+ * Because these are aliases and not copies, renaming a field in the backend's
+ * `PayslipExtraction`/`Payslip` (see CLAUDE.md, "Field names") breaks the
+ * frontend build on the next regeneration instead of silently rendering
+ * `undefined`.
+ */
+import type { components } from "./schema";
+
+/** A payslip as returned by `POST /api/upload` and `GET /api/payslips`. */
+export type Payslip = components["schemas"]["Payslip"];
+
+/** Reply envelope of `POST /api/chat`. */
+export type ChatResponse = components["schemas"]["ChatResponse"];
+
+/**
+ * FastAPI's error body.
+ *
+ * `detail` is a plain string for the `HTTPException`s our routers raise
+ * (`{"detail": "Seuls les fichiers PDF sont acceptés."}`), but an array of
+ * validation objects for FastAPI's own request-validation 422s. The generated
+ * schema only knows about the second shape, so the union is declared here and
+ * narrowed at runtime by `getApiErrorMessage` — not asserted away.
+ */
+export interface ApiErrorBody {
+  detail?: string | components["schemas"]["ValidationError"][];
+}

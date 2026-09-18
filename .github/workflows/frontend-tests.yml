@@ -1,14 +1,14 @@
-name: mypy
+name: frontend-tests
 
 on:
   push:
     paths:
-      - "backend/**"
-      - ".github/workflows/mypy.yml"
+      - "frontend/**"
+      - ".github/workflows/frontend-tests.yml"
   pull_request:
     paths:
-      - "backend/**"
-      - ".github/workflows/mypy.yml"
+      - "frontend/**"
+      - ".github/workflows/frontend-tests.yml"
 
 concurrency:
   # head_ref (PR events) and ref_name (push events) both resolve to the bare
@@ -19,20 +19,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  mypy:
+  frontend-tests:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
+      - name: Install dependencies
+        run: npm ci
 
-      - name: mypy --strict
-        run: mypy --strict app/
+      - name: Run tests
+        run: npm run test

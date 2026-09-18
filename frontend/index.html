@@ -2,6 +2,27 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Sets data-theme before the stylesheet is parsed, so a user who chose
+      dark (or light) sees it immediately instead of a flash of the wrong
+      theme while React mounts and src/hooks/useTheme.ts's effect runs.
+      Mirrors that hook's own applyOverride() — see its comment. Kept as
+      plain, un-bundled JS here on purpose: it has to run before any
+      module script, including the app's own.
+    -->
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("infopay-theme");
+          if (theme === "light" || theme === "dark") {
+            document.documentElement.setAttribute("data-theme", theme);
+          }
+        } catch {
+          // localStorage unavailable — fall through to the CSS-only
+          // @media (prefers-color-scheme) default, same as useTheme.ts.
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,6 +35,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
