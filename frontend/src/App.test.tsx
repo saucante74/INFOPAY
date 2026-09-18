@@ -68,7 +68,7 @@ describe("App — public home page", () => {
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "Assistant & Analytics de fiches de paie" })
+      await screen.findByRole("heading", { name: "Assistant et analyse : Bulletin de salaire" })
     ).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");
     expect(screen.queryByLabelText("Identifiant")).not.toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("App — login modal triggered by a protected action", () => {
     const user = userEvent.setup();
     mockUploadPayslip.mockResolvedValueOnce(makePayslip());
     render(<App />);
-    await screen.findByRole("heading", { name: "Assistant & Analytics de fiches de paie" });
+    await screen.findByRole("heading", { name: "Assistant et analyse : Bulletin de salaire" });
 
     await user.upload(getFileInput(), pdfFile);
     expect(mockUploadPayslip).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("App — login modal triggered by a protected action", () => {
     const user = userEvent.setup();
     mockSendChatMessage.mockResolvedValueOnce("Réponse de l'assistant.");
     render(<App />);
-    await screen.findByRole("heading", { name: "Assistant & Analytics de fiches de paie" });
+    await screen.findByRole("heading", { name: "Assistant et analyse : Bulletin de salaire" });
 
     const input = screen.getByPlaceholderText("Posez une question sur vos bulletins…");
     await user.type(input, "Une question{enter}");
@@ -127,7 +127,7 @@ describe("App — login modal triggered by a protected action", () => {
   it("closing the modal without logging in leaves the action un-taken", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "Assistant & Analytics de fiches de paie" });
+    await screen.findByRole("heading", { name: "Assistant et analyse : Bulletin de salaire" });
 
     await user.upload(getFileInput(), pdfFile);
     await screen.findByRole("dialog", { name: "Connexion" });

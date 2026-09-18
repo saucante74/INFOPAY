@@ -11,7 +11,7 @@ export default function AnalyzerPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-bold">Assistant & Analytics de fiches de paie</h1>
+        <h1 className="text-2xl font-bold">Assistant et analyse : Bulletin de salaire</h1>
         <p className="mt-1 text-sm text-ink-soft">
           Importez vos bulletins pour suivre leur évolution et poser vos questions à l'assistant.
         </p>
