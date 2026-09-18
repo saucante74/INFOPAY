@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -57,7 +57,31 @@ describe("Navbar", () => {
     expect(screen.queryByRole("button", { name: "Se connecter" })).not.toBeInTheDocument();
   });
 
-  it("logs out without navigating anywhere — '/' is public, there's nowhere it needs to send you", async () => {
+  it("clicking 'Se déconnecter' asks for confirmation before clearing the token", async () => {
+    const user = userEvent.setup();
+    setToken("jwt.token.value");
+    renderWithRouter(<Navbar />);
+
+    await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+
+    expect(screen.getByRole("dialog", { name: "Se déconnecter ?" })).toBeInTheDocument();
+    expect(getToken()).toBe("jwt.token.value");
+  });
+
+  it("cancelling the logout confirmation leaves the session untouched", async () => {
+    const user = userEvent.setup();
+    setToken("jwt.token.value");
+    renderWithRouter(<Navbar />);
+
+    await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    await user.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(getToken()).toBe("jwt.token.value");
+    expect(screen.getByRole("button", { name: "Se déconnecter" })).toBeInTheDocument();
+  });
+
+  it("confirming the logout clears the token without navigating anywhere — '/' is public, there's nowhere it needs to send you", async () => {
     const user = userEvent.setup();
     setToken("jwt.token.value");
     renderWithRouter(
@@ -72,8 +96,13 @@ describe("Navbar", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    // The dialog's confirm button shares the trigger's accessible name
+    // ("Se déconnecter"), so it's queried scoped to the dialog itself.
+    const dialog = screen.getByRole("dialog", { name: "Se déconnecter ?" });
+    await user.click(within(dialog).getByRole("button", { name: "Se déconnecter" }));
 
     expect(getToken()).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("Page Aide")).toBeInTheDocument();
     expect(screen.queryByText("Page de connexion")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();

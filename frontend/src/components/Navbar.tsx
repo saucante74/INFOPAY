@@ -1,8 +1,10 @@
 import { LogIn, LogOut } from "lucide-react";
+import { useState } from "react";
 import { NavLink } from "react-router";
 
 import { requireAuth } from "../auth/authModal";
 import { clearToken, useAuthToken } from "../auth/tokenStore";
+import ConfirmDialog from "./ConfirmDialog";
 import ThemeToggle from "./ThemeToggle";
 
 /**
@@ -21,11 +23,12 @@ function navLinkClassName({ isActive }: { isActive: boolean }): string {
 
 export default function Navbar() {
   const token = useAuthToken();
+  const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
 
   return (
     <header className="border-b border-border bg-surface-raised">
       {/* Matches `RootLayout`'s `<main>` width — see RAPPORT.md. */}
-      <div className="mx-auto flex h-16 w-full max-w-[1800px] items-center gap-6 px-4">
+      <div className="mx-auto flex h-16 w-full max-w-[1540px] items-center gap-6 px-4">
         <div className="flex items-center gap-2">
           {/* `logo-mark.svg`: a genuinely transparent, hand-authored vector
               icon (a document outline + a teal checkmark seal), confirmed
@@ -59,7 +62,9 @@ export default function Navbar() {
           {token ? (
             <button
               type="button"
-              onClick={clearToken}
+              onClick={() => {
+                setIsConfirmingLogout(true);
+              }}
               aria-label="Se déconnecter"
               title="Se déconnecter"
               className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-ink"
@@ -81,6 +86,26 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Reuses `ConfirmDialog` as-is (title/message/labels via props) —
+          the same generic component `PayslipTable` already uses for the
+          delete-a-payslip confirmation, not a second dialog built for this
+          one case. `clearToken` is synchronous, so unlike `PayslipTable`'s
+          `onDelete` there's nothing to await and no `isConfirming` state
+          to pass. */}
+      <ConfirmDialog
+        isOpen={isConfirmingLogout}
+        title="Se déconnecter ?"
+        message="Vous devrez vous reconnecter pour importer un bulletin ou poser une question à l'assistant."
+        confirmLabel="Se déconnecter"
+        onConfirm={() => {
+          clearToken();
+          setIsConfirmingLogout(false);
+        }}
+        onCancel={() => {
+          setIsConfirmingLogout(false);
+        }}
+      />
     </header>
   );
 }
