@@ -1,19 +1,6 @@
-import { Bell, FileText, User } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import ThemeToggle from "./ThemeToggle";
-
-/**
- * The four items shown in docs/InfoPay.pdf's navbar. Only "Tableau de
- * bord" corresponds to a page that actually exists — this is a
- * single-route app with no router. The other three are rendered as real,
- * focusable `<button>`s (not `<span>`s, not `disabled`) so they read as
- * genuinely interactive rather than silently inert, but intentionally
- * carry no `onClick`: there is nowhere for them to navigate to yet, and
- * inventing a fake destination would be worse than leaving them as
- * documented placeholders. See RAPPORT.md, "Navigation without a
- * destination", for the full reasoning.
- */
-const NAV_LINKS = ["Historique", "Rapports", "Aide"] as const satisfies readonly string[];
 
 export default function Navbar() {
   return (
@@ -38,35 +25,19 @@ export default function Navbar() {
             aria-current="page"
             className="font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4"
           >
-            Tableau de bord
+            Analyseur
           </button>
-          {NAV_LINKS.map((label) => (
-            <button
-              key={label}
-              type="button"
-              className="text-ink-soft transition-colors hover:text-ink"
-            >
-              {label}
-            </button>
-          ))}
+          {/* "Aide" has no destination yet — a real, focusable <button>
+              with no onClick, intentionally, rather than a fake href="#" or
+              a disabled/inert element. See RAPPORT.md, "Navigation without a
+              destination". */}
+          <button type="button" className="text-ink-soft transition-colors hover:text-ink">
+            Aide
+          </button>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-ink-soft transition-colors hover:text-ink"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Compte utilisateur"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white"
-          >
-            <User className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </header>
