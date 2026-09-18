@@ -59,3 +59,47 @@ def test_list_payslips_empty_then_populated(client, sample_pdf_bytes):
     payslips = client.get("/api/payslips").json()
     assert len(payslips) == 1
     assert payslips[0]["mois_annee"] == "03/2025"
+
+
+def test_delete_payslip_removes_it_from_the_db_and_the_vector_store(
+    client, fake_vector_store, sample_pdf_bytes
+):
+    upload_response = client.post(
+        "/api/upload", files={"file": ("bulletin.pdf", sample_pdf_bytes, "application/pdf")}
+    )
+    payslip_id = upload_response.json()["id"]
+    assert client.get("/api/payslips").json() != []
+
+    response = client.delete(f"/api/payslips/{payslip_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert client.get("/api/payslips").json() == []
+    # The vector store was asked to remove this exact payslip's chunks.
+    assert fake_vector_store.deleted == [payslip_id]
+
+
+def test_delete_payslip_404_on_an_id_that_does_not_exist(client, fake_vector_store):
+    response = client.delete("/api/payslips/999")
+
+    assert response.status_code == 404
+    assert "999" in response.json()["detail"]
+    # Never reached the vector store for an id that was never persisted.
+    assert fake_vector_store.deleted == []
+
+
+def test_delete_payslip_requires_authentication(auth_client, token, sample_pdf_bytes):
+    upload_response = auth_client.post(
+        "/api/upload",
+        files={"file": ("bulletin.pdf", sample_pdf_bytes, "application/pdf")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    payslip_id = upload_response.json()["id"]
+
+    unauthenticated = auth_client.delete(f"/api/payslips/{payslip_id}")
+    assert unauthenticated.status_code == 401
+
+    authenticated = auth_client.delete(
+        f"/api/payslips/{payslip_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert authenticated.status_code == 204

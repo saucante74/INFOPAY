@@ -1,7 +1,9 @@
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { sendChatMessage } from "../api/client";
+import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
+import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 /**
  * `as const satisfies readonly string[]`: `satisfies` checks the contract
@@ -32,10 +34,7 @@ export default function ChatPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const send = async (text: string): Promise<void> => {
-    const content = text.trim();
-    if (!content || isLoading) return;
-
+  const performSend = async (content: string): Promise<void> => {
     setMessages((prev) => [...prev, { role: "user", content }]);
     setInput("");
     setIsLoading(true);
@@ -43,18 +42,37 @@ export default function ChatPanel() {
     try {
       const reply = await sendChatMessage(content);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
+      // See UploadZone.tsx's identical call for why this is a safe local
+      // update rather than a second network round trip.
+      decrementRateLimit("chat");
+    } catch (error) {
+      const rateLimit = getRateLimit(error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content:
-            "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
+          content: rateLimit
+            ? `Limite de questions atteinte pour cette heure. Réessayez ${formatRetryDelay(rateLimit)}.`
+            : "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Logged in: `requireAuth` calls `performSend` immediately — identical to
+  // the previous behaviour, including the input clearing and the user's
+  // bubble appearing synchronously. Logged out: the shared login modal
+  // opens and `performSend(content)` resumes once login succeeds, with the
+  // exact text the user typed (captured by the closure) — nothing is added
+  // to the chat, and the input isn't cleared, until it actually sends.
+  const send = (text: string): void => {
+    const content = text.trim();
+    if (!content || isLoading) return;
+    requireAuth(() => {
+      void performSend(content);
+    });
   };
 
   return (
@@ -75,7 +93,7 @@ export default function ChatPanel() {
               <button
                 key={s}
                 onClick={() => {
-                  void send(s);
+                  send(s);
                 }}
                 className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-ink-soft transition-colors hover:border-accent hover:text-ink"
               >
@@ -112,7 +130,7 @@ export default function ChatPanel() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void send(input);
+          send(input);
         }}
         className="flex items-center gap-2 border-t border-border p-3"
       >

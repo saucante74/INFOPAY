@@ -75,6 +75,9 @@ class ChromaVectorStore:
             hits.append({"text": doc, "mois_annee": meta.get("mois_annee")})
         return hits
 
+    def delete(self, payslip_id: int) -> None:
+        self._collection.delete(where={"payslip_id": payslip_id})
+
 
 @lru_cache(maxsize=1)
 def get_default_vector_store() -> ChromaVectorStore:

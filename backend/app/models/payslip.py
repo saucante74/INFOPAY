@@ -21,6 +21,9 @@ class PayslipExtraction(BaseModel):
     mois_annee: str = Field(
         description="Mois et année du bulletin de paie, au format 'MM/YYYY' (ex: '03/2025')."
     )
+    nom_entreprise: str = Field(
+        description="Nom de l'entreprise employeuse, généralement indiqué en haut du bulletin."
+    )
     salaire_brut: float = Field(description="Salaire brut mensuel en euros.")
     net_imposable: float = Field(description="Net imposable en euros.")
     net_a_payer: float = Field(description="Net à payer (net versé au salarié) en euros.")
@@ -45,6 +48,13 @@ class Payslip(SQLModel, table=True):
 
     id: Optional[int] = SQLField(default=None, primary_key=True)
     mois_annee: str
+    # Nullable, contrairement à `PayslipExtraction.nom_entreprise` (requis) :
+    # les bulletins déjà en base avant l'ajout de ce champ n'en ont pas, et
+    # `SQLModel.metadata.create_all()` ne migre pas les tables existantes
+    # (voir README/RAPPORT.md pour la commande à lancer sur une base déjà
+    # créée). Un champ requis ici casserait la lecture de ces anciennes
+    # lignes ; le frontend affiche "Non renseigné" quand la valeur est None.
+    nom_entreprise: Optional[str] = None
     salaire_brut: float
     net_imposable: float
     net_a_payer: float

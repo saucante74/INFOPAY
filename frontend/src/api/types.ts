@@ -20,6 +20,18 @@ export type Payslip = components["schemas"]["Payslip"];
 /** Reply envelope of `POST /api/chat`. */
 export type ChatResponse = components["schemas"]["ChatResponse"];
 
+/** Body of `POST /api/auth/login`. */
+export type LoginRequest = components["schemas"]["LoginRequest"];
+
+/** Reply of `POST /api/auth/login`. */
+export type TokenResponse = components["schemas"]["TokenResponse"];
+
+/** Quota status for one rate-limited scope, as returned within `RateLimits`. */
+export type RateLimitStatus = components["schemas"]["RateLimitStatus"];
+
+/** Reply of `GET /api/rate-limits`. */
+export type RateLimits = components["schemas"]["RateLimitsResponse"];
+
 /**
  * FastAPI's error body.
  *

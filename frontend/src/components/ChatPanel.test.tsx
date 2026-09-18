@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,11 +6,33 @@ import ChatPanel from "./ChatPanel";
 
 vi.mock("../api/client", () => ({
   sendChatMessage: vi.fn(),
+  getRateLimit: vi.fn(),
+  formatRetryDelay: vi.fn(),
 }));
 
-import { sendChatMessage } from "../api/client";
+vi.mock("../hooks/useRateLimits", () => ({
+  decrementRateLimit: vi.fn(),
+}));
+
+// Default: run the action immediately, as `requireAuth` does when already
+// logged in — every existing test below exercises that path, unchanged
+// from before this mock existed. See "requires login before sending" for
+// the gated (logged-out) path.
+vi.mock("../auth/authModal", () => ({
+  requireAuth: vi.fn((action?: () => void) => {
+    action?.();
+  }),
+}));
+
+import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
+import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 const mockSendChatMessage = vi.mocked(sendChatMessage);
+const mockGetRateLimit = vi.mocked(getRateLimit);
+const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
+const mockRequireAuth = vi.mocked(requireAuth);
+const mockDecrementRateLimit = vi.mocked(decrementRateLimit);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
@@ -26,6 +48,12 @@ function getSubmitButton(): HTMLElement {
 
 beforeEach(() => {
   mockSendChatMessage.mockReset();
+  mockGetRateLimit.mockReset();
+  mockFormatRetryDelay.mockReset();
+  mockRequireAuth.mockReset().mockImplementation((action?: () => void) => {
+    action?.();
+  });
+  mockDecrementRateLimit.mockReset();
 });
 
 describe("ChatPanel", () => {
@@ -52,6 +80,8 @@ describe("ChatPanel", () => {
 
     resolve("Le net à payer moyen est de 2 340 €.");
     expect(await screen.findByText("Le net à payer moyen est de 2 340 €.")).toBeInTheDocument();
+    // A successful send consumed one hit of the `chat` scope's budget.
+    expect(mockDecrementRateLimit).toHaveBeenCalledWith("chat");
   });
 
   it("shows a loading indicator while the reply is pending, and disables the submit button", async () => {
@@ -92,6 +122,31 @@ describe("ChatPanel", () => {
         "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé."
       )
     ).toBeInTheDocument();
+    // A failed send never reached the backend's rate limiter, so nothing
+    // should be decremented locally either.
+    expect(mockDecrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("shows a specific message when the hourly question limit is reached", async () => {
+    const user = userEvent.setup();
+    mockSendChatMessage.mockRejectedValueOnce(new Error("429"));
+    mockGetRateLimit.mockReturnValueOnce({ retryAfterMinutes: 5 });
+    mockFormatRetryDelay.mockReturnValueOnce("dans 5 min");
+    render(<ChatPanel />);
+
+    const input = screen.getByPlaceholderText("Posez une question sur vos bulletins…");
+    await user.type(input, "Une question{enter}");
+
+    expect(
+      await screen.findByText(
+        "Limite de questions atteinte pour cette heure. Réessayez dans 5 min."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé."
+      )
+    ).not.toBeInTheDocument();
   });
 
   it("does not send an empty or whitespace-only message", async () => {
@@ -108,6 +163,8 @@ describe("ChatPanel", () => {
     await user.click(submitButton);
     expect(mockSendChatMessage).not.toHaveBeenCalled();
     expect(screen.getByText("Suggestions")).toBeInTheDocument();
+    // An empty message never reaches the auth gate at all.
+    expect(mockRequireAuth).not.toHaveBeenCalled();
   });
 
   it("aligns the user's message to the right and the assistant's reply to the left", async () => {
@@ -123,5 +180,52 @@ describe("ChatPanel", () => {
     const assistantRow = screen.getByText("Réponse de l'assistant.").closest(".flex");
     expect(userRow?.className).toContain("justify-end");
     expect(assistantRow?.className).toContain("justify-start");
+    // Every non-empty send goes through the auth gate, even when (as here,
+    // and in every test above) it turns out to already be satisfied.
+    expect(mockRequireAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires login before sending: does not call the API when logged out", async () => {
+    const user = userEvent.setup();
+    mockRequireAuth.mockImplementation(() => {
+      // Simulates "logged out": requireAuth opens the modal instead of
+      // running the action — verified here by simply *not* calling it.
+    });
+    render(<ChatPanel />);
+
+    const input = screen.getByPlaceholderText("Posez une question sur vos bulletins…");
+    await user.type(input, "Une question{enter}");
+
+    expect(mockRequireAuth).toHaveBeenCalledTimes(1);
+    expect(mockSendChatMessage).not.toHaveBeenCalled();
+    // Nothing added to the chat, and the input wasn't cleared — the
+    // message hasn't actually "been sent" yet.
+    expect(screen.queryByText("Une question")).not.toBeInTheDocument();
+    expect(input).toHaveValue("Une question");
+  });
+
+  it("resumes the exact message once login succeeds, with the input already cleared", async () => {
+    const user = userEvent.setup();
+    let resumeSend: (() => void) | undefined;
+    mockRequireAuth.mockImplementation((action?: () => void) => {
+      resumeSend = action;
+    });
+    mockSendChatMessage.mockResolvedValueOnce("Réponse de l'assistant.");
+    render(<ChatPanel />);
+
+    const input = screen.getByPlaceholderText("Posez une question sur vos bulletins…");
+    await user.type(input, "Une question{enter}");
+    expect(mockSendChatMessage).not.toHaveBeenCalled();
+
+    // The login modal isn't rendered by ChatPanel itself (see App.test.tsx
+    // for the full, real modal flow) — this simulates exactly what it does
+    // on success: call the stashed action.
+    act(() => {
+      resumeSend?.();
+    });
+
+    expect(mockSendChatMessage).toHaveBeenCalledWith("Une question");
+    expect(screen.getByText("Une question")).toBeInTheDocument();
+    expect(await screen.findByText("Réponse de l'assistant.")).toBeInTheDocument();
   });
 });

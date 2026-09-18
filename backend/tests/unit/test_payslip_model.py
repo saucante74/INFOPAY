@@ -1,12 +1,13 @@
 """
 Tests unitaires des schémas de `app/models/payslip.py` :
 
-- `PayslipExtraction` (Pydantic) : validation des 8 champs canoniques
-  utilisés pour guider l'extraction LLM et valider ses résultats.
+- `PayslipExtraction` (Pydantic) : validation des 9 champs canoniques
+  utilisés pour guider l'extraction LLM et valider ses résultats (les 8
+  historiques + `nom_entreprise`).
 - `Payslip` (SQLModel) : compatibilité avec `PayslipExtraction.model_dump()`,
   exactement comme `upload.py` les enchaîne en production.
 
-CLAUDE.md est explicite sur ces 8 champs : "Don't rename them without
+CLAUDE.md est explicite sur ces champs : "Don't rename them without
 updating the schema, the DB model, analytics.py's FIELD_MAP, and the
 frontend table/chart together." Ces tests servent de garde-fou contre un
 renommage silencieux d'un seul côté.
@@ -20,6 +21,7 @@ from app.models.payslip import Payslip, PayslipExtraction
 
 CANONICAL_FIELDS = {
     "mois_annee",
+    "nom_entreprise",
     "salaire_brut",
     "net_imposable",
     "net_a_payer",
@@ -33,6 +35,7 @@ CANONICAL_FIELDS = {
 def _valid_kwargs() -> dict:
     return dict(
         mois_annee="03/2025",
+        nom_entreprise="ACME SARL",
         salaire_brut=3000.0,
         net_imposable=2400.0,
         net_a_payer=2300.0,
@@ -86,6 +89,18 @@ def test_payslip_row_accepts_extraction_model_dump():
     assert payslip.mois_annee == "03/2025"
     assert payslip.net_a_payer == 2300.0
     assert payslip.id is None  # pas encore persisté
+
+
+def test_payslip_nom_entreprise_defaults_to_none_when_absent():
+    # Contrairement à `PayslipExtraction.nom_entreprise` (requis), le champ
+    # est optionnel côté `Payslip` : une ligne construite sans lui (comme un
+    # bulletin importé avant l'ajout de ce champ, relu depuis une base déjà
+    # créée) reste valide plutôt que de lever. Le frontend affiche "Non
+    # renseigné" pour ce cas.
+    kwargs = _valid_kwargs()
+    del kwargs["nom_entreprise"]
+    payslip = Payslip(**kwargs, raw_text="texte brut", filename="bulletin.pdf")
+    assert payslip.nom_entreprise is None
 
 
 def test_payslip_created_at_defaults_to_now_and_survives_a_db_round_trip(test_engine):

@@ -7,12 +7,13 @@ from app.db import get_session
 from app.dependencies import get_extractor, get_vector_store
 from app.interfaces import Extractor, VectorStore
 from app.models.payslip import Payslip
+from app.rate_limit import upload_rate_limit
 from app.services.extraction import extract_text_from_pdf
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(upload_rate_limit)])
 async def upload_payslip(
     file: UploadFile,
     session: Session = Depends(get_session),
@@ -54,3 +55,19 @@ def list_payslips(session: Session = Depends(get_session)) -> Sequence[Payslip]:
 
     payslips = session.exec(select(Payslip).order_by(Payslip.mois_annee)).all()
     return payslips
+
+
+@router.delete("/payslips/{payslip_id}", status_code=204)
+def delete_payslip(
+    payslip_id: int,
+    session: Session = Depends(get_session),
+    vector_store: VectorStore = Depends(get_vector_store),
+) -> None:
+    payslip = session.get(Payslip, payslip_id)
+    if payslip is None:
+        raise HTTPException(status_code=404, detail=f"Bulletin {payslip_id} introuvable.")
+
+    vector_store.delete(payslip_id)
+
+    session.delete(payslip)
+    session.commit()

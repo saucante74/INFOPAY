@@ -33,3 +33,9 @@ class VectorStore(Protocol):
 
     def search(self, query: str, n_results: int = 3) -> list[dict[str, Any]]:
         ...
+
+    def delete(self, payslip_id: int) -> None:
+        """Removes every chunk indexed for this payslip. A no-op, not an
+        error, if none were ever indexed (e.g. extraction on an empty
+        text) -- deleting is idempotent from the caller's point of view."""
+        ...
