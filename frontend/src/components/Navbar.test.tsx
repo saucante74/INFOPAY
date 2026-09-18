@@ -127,19 +127,22 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
   });
 
-  it("shows the rate-limit badge once logged in and the quotas have loaded", async () => {
+  it("shows the rate-limit badge (as accessible meters) once logged in and the quotas have loaded", async () => {
     setToken("jwt.token.value");
     mockFetchRateLimits.mockResolvedValueOnce(makeRateLimits());
     renderWithRouter(<Navbar />);
 
-    expect(await screen.findByText(/imports/)).toBeInTheDocument();
-    expect(screen.getByText(/questions/)).toBeInTheDocument();
+    // `RateLimitBadge.test.tsx` covers the gauges' own rendering in
+    // detail; this just confirms `Navbar` actually mounts it once data
+    // exists, via the accessible name `role="meter"` exposes (the gauge
+    // itself has no plain visible text — see RAPPORT.md).
+    expect(await screen.findAllByRole("meter")).toHaveLength(2);
   });
 
   it("does not show the rate-limit badge when logged out", () => {
     renderWithRouter(<Navbar />);
 
-    expect(screen.queryByText(/imports/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
     expect(mockFetchRateLimits).not.toHaveBeenCalled();
   });
 
@@ -148,14 +151,14 @@ describe("Navbar", () => {
     setToken("jwt.token.value");
     mockFetchRateLimits.mockResolvedValueOnce(makeRateLimits());
     renderWithRouter(<Navbar />);
-    await screen.findByText(/imports/);
+    await screen.findAllByRole("meter");
 
     await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
     const dialog = screen.getByRole("dialog", { name: "Se déconnecter ?" });
     await user.click(within(dialog).getByRole("button", { name: "Se déconnecter" }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/imports/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("meter")).not.toBeInTheDocument();
     });
   });
 
