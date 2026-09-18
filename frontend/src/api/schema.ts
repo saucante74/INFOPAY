@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rate-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rate Limits */
+        get: operations["rate_limits_api_rate_limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -178,6 +195,23 @@ export interface components {
              * Format: date-time
              */
             created_at?: string;
+        };
+        /** RateLimitStatus */
+        RateLimitStatus: {
+            /** Remaining */
+            remaining: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Reset At
+             * Format: date-time
+             */
+            reset_at: string;
+        };
+        /** RateLimitsResponse */
+        RateLimitsResponse: {
+            upload: components["schemas"]["RateLimitStatus"];
+            chat: components["schemas"]["RateLimitStatus"];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -355,6 +389,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_limits_api_rate_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateLimitsResponse"];
                 };
             };
         };

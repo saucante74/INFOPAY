@@ -10,6 +10,10 @@ vi.mock("../api/client", () => ({
   formatRetryDelay: vi.fn(),
 }));
 
+vi.mock("../hooks/useRateLimits", () => ({
+  decrementRateLimit: vi.fn(),
+}));
+
 // Default: run the action immediately, as `requireAuth` does when already
 // logged in — every existing test below exercises that path, unchanged
 // from before this mock existed. See "requires login before sending" for
@@ -22,11 +26,13 @@ vi.mock("../auth/authModal", () => ({
 
 import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
 import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 const mockSendChatMessage = vi.mocked(sendChatMessage);
 const mockGetRateLimit = vi.mocked(getRateLimit);
 const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
 const mockRequireAuth = vi.mocked(requireAuth);
+const mockDecrementRateLimit = vi.mocked(decrementRateLimit);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
@@ -47,6 +53,7 @@ beforeEach(() => {
   mockRequireAuth.mockReset().mockImplementation((action?: () => void) => {
     action?.();
   });
+  mockDecrementRateLimit.mockReset();
 });
 
 describe("ChatPanel", () => {
@@ -73,6 +80,8 @@ describe("ChatPanel", () => {
 
     resolve("Le net à payer moyen est de 2 340 €.");
     expect(await screen.findByText("Le net à payer moyen est de 2 340 €.")).toBeInTheDocument();
+    // A successful send consumed one hit of the `chat` scope's budget.
+    expect(mockDecrementRateLimit).toHaveBeenCalledWith("chat");
   });
 
   it("shows a loading indicator while the reply is pending, and disables the submit button", async () => {
@@ -113,6 +122,9 @@ describe("ChatPanel", () => {
         "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé."
       )
     ).toBeInTheDocument();
+    // A failed send never reached the backend's rate limiter, so nothing
+    // should be decremented locally either.
+    expect(mockDecrementRateLimit).not.toHaveBeenCalled();
   });
 
   it("shows a specific message when the hourly question limit is reached", async () => {

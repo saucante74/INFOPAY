@@ -1,12 +1,31 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LoginModal from "../auth/LoginModal";
 import { getToken, setToken } from "../auth/tokenStore";
+import { makeRateLimits } from "../test/fixtures";
 import { renderWithRouter } from "../test/helpers";
 import Navbar from "./Navbar";
+
+// The real `useRateLimits` hook runs (it's cheap and not the focus of most
+// tests here), but its one network call is mocked at the module boundary —
+// same convention as every other component test — so tests that log in
+// don't fire a real, unhandled request to `/api/rate-limits`.
+vi.mock("../api/client", () => ({
+  fetchRateLimits: vi.fn(),
+}));
+
+import { fetchRateLimits } from "../api/client";
+
+const mockFetchRateLimits = vi.mocked(fetchRateLimits);
+
+beforeEach(() => {
+  // Never resolves unless a test opts in: most tests here don't care about
+  // the rate-limit badge, and a pending promise just leaves it hidden.
+  mockFetchRateLimits.mockReset().mockImplementation(() => new Promise(() => undefined));
+});
 
 describe("Navbar", () => {
   it("marks 'Analyseur' as the current page on '/'", () => {
@@ -106,6 +125,38 @@ describe("Navbar", () => {
     expect(screen.getByText("Page Aide")).toBeInTheDocument();
     expect(screen.queryByText("Page de connexion")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
+  });
+
+  it("shows the rate-limit badge once logged in and the quotas have loaded", async () => {
+    setToken("jwt.token.value");
+    mockFetchRateLimits.mockResolvedValueOnce(makeRateLimits());
+    renderWithRouter(<Navbar />);
+
+    expect(await screen.findByText(/imports/)).toBeInTheDocument();
+    expect(screen.getByText(/questions/)).toBeInTheDocument();
+  });
+
+  it("does not show the rate-limit badge when logged out", () => {
+    renderWithRouter(<Navbar />);
+
+    expect(screen.queryByText(/imports/)).not.toBeInTheDocument();
+    expect(mockFetchRateLimits).not.toHaveBeenCalled();
+  });
+
+  it("hides the rate-limit badge again after logging out", async () => {
+    const user = userEvent.setup();
+    setToken("jwt.token.value");
+    mockFetchRateLimits.mockResolvedValueOnce(makeRateLimits());
+    renderWithRouter(<Navbar />);
+    await screen.findByText(/imports/);
+
+    await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    const dialog = screen.getByRole("dialog", { name: "Se déconnecter ?" });
+    await user.click(within(dialog).getByRole("button", { name: "Se déconnecter" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/imports/)).not.toBeInTheDocument();
+    });
   });
 
   it("opens the shared login modal from 'Se connecter', in place, without navigating", async () => {

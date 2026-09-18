@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
 import type { Payslip } from "../api/types";
 import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 /**
  * Discriminated union instead of the previous `status: null | "uploading" |
@@ -37,6 +38,10 @@ export default function UploadZone({ onUploaded }: UploadZoneProps) {
         const payslip = await uploadPayslip(file);
         setUpload({ status: "idle" });
         onUploaded(payslip);
+        // The request just succeeded, so it consumed exactly one hit of
+        // the `upload` scope's budget — see useRateLimits.ts for why this
+        // is a safe local update rather than a second network round trip.
+        decrementRateLimit("upload");
       } catch (error) {
         const rateLimit = getRateLimit(error);
         setUpload({

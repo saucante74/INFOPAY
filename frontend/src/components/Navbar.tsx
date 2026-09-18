@@ -4,7 +4,9 @@ import { NavLink } from "react-router";
 
 import { requireAuth } from "../auth/authModal";
 import { clearToken, useAuthToken } from "../auth/tokenStore";
+import { useRateLimits } from "../hooks/useRateLimits";
 import ConfirmDialog from "./ConfirmDialog";
+import RateLimitBadge from "./RateLimitBadge";
 import ThemeToggle from "./ThemeToggle";
 
 /**
@@ -23,6 +25,7 @@ function navLinkClassName({ isActive }: { isActive: boolean }): string {
 
 export default function Navbar() {
   const token = useAuthToken();
+  const rateLimits = useRateLimits();
   const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
 
   return (
@@ -53,7 +56,13 @@ export default function Navbar() {
           </NavLink>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
+          {/* `useRateLimits()` already returns `null` while logged out, so
+              this alone covers "only for a logged-in user" — including the
+              brief window right after login before the first fetch
+              resolves, where nothing should render yet rather than a
+              stale/zeroed badge. */}
+          {rateLimits && <RateLimitBadge limits={rateLimits} />}
           <ThemeToggle />
           {/* No navigation either way: logging out no longer sends you
               anywhere (there's nowhere it needs to — "/" is public), and

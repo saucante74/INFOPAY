@@ -23,6 +23,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 
@@ -63,11 +64,10 @@ class RateLimit:
         self._lock = threading.Lock()
 
     def __call__(self) -> None:
-        limit = self._limit if self._limit is not None else get_rate_limit_per_hour()
+        limit = self.limit()
         with self._lock:
             now = self._clock()
-            while self._hits and self._hits[0] <= now - self._window:
-                self._hits.popleft()
+            self._prune(now)
             if len(self._hits) >= limit:
                 retry_after = max(1, math.ceil(self._hits[0] + self._window - now))
                 requests = "requête" if limit == 1 else "requêtes"
@@ -80,6 +80,42 @@ class RateLimit:
                     headers={"Retry-After": str(retry_after)},
                 )
             self._hits.append(now)
+
+    def _prune(self, now: float) -> None:
+        """Drops hits that have aged out of the window. Caller must already
+        hold `_lock`."""
+        while self._hits and self._hits[0] <= now - self._window:
+            self._hits.popleft()
+
+    def limit(self) -> int:
+        """The limit currently in effect — recomputed from the env var each
+        call when not fixed at construction, same as `__call__`, so this
+        never disagrees with what actually gets enforced."""
+        return self._limit if self._limit is not None else get_rate_limit_per_hour()
+
+    def remaining(self) -> int:
+        """Requests still allowed in the current window, from the hits
+        already held in memory — a read, unlike `__call__`, which also
+        records a hit."""
+        with self._lock:
+            now = self._clock()
+            self._prune(now)
+            return max(0, self.limit() - len(self._hits))
+
+    def reset_at(self) -> datetime:
+        """When the next slot frees up: the oldest hit's expiry, or now if
+        the window is already empty. Built from `datetime.now(UTC)` plus a
+        duration derived from `_clock()` (which is monotonic, not wall-clock,
+        and can't be converted to an absolute instant on its own — but a
+        *difference* between two of its readings is a valid duration)."""
+        with self._lock:
+            now = self._clock()
+            self._prune(now)
+            if not self._hits:
+                seconds_until_free_slot = 0.0
+            else:
+                seconds_until_free_slot = max(0.0, self._hits[0] + self._window - now)
+        return datetime.now(UTC) + timedelta(seconds=seconds_until_free_slot)
 
     def reset(self) -> None:
         with self._lock:

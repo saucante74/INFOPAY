@@ -12,7 +12,7 @@ from app.auth.router import router as auth_router
 from app.auth.security import get_auth_settings, require_auth
 from app.db import init_db
 from app.rate_limit import get_rate_limit_per_hour
-from app.routers import chat, upload
+from app.routers import chat, rate_limits, upload
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ _authenticated = [Depends(require_auth)]
 app.include_router(auth_router)
 app.include_router(upload.router, dependencies=_authenticated)
 app.include_router(chat.router, dependencies=_authenticated)
+app.include_router(rate_limits.router, dependencies=_authenticated)
 
 
 @app.get("/api/health")

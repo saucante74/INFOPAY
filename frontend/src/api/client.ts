@@ -1,7 +1,14 @@
 import axios from "axios";
 
 import { attachAuth } from "../auth/attachAuth";
-import type { ApiErrorBody, ChatResponse, LoginRequest, Payslip, TokenResponse } from "./types";
+import type {
+  ApiErrorBody,
+  ChatResponse,
+  LoginRequest,
+  Payslip,
+  RateLimits,
+  TokenResponse,
+} from "./types";
 
 export const api = axios.create({
   // `||`, not `??`: an env var set but left empty (`VITE_API_URL=` in a
@@ -42,6 +49,13 @@ export async function deletePayslip(id: number): Promise<void> {
 export async function sendChatMessage(message: string): Promise<string> {
   const { data } = await api.post<ChatResponse>("/api/chat", { message });
   return data.reply;
+}
+
+/** The current upload/chat quotas. Requires auth — rejects with a 401 if
+ * called while logged out, same as any other protected endpoint. */
+export async function fetchRateLimits(): Promise<RateLimits> {
+  const { data } = await api.get<RateLimits>("/api/rate-limits");
+  return data;
 }
 
 /**

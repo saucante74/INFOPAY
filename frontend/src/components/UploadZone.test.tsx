@@ -13,6 +13,10 @@ vi.mock("../api/client", () => ({
   formatRetryDelay: vi.fn(),
 }));
 
+vi.mock("../hooks/useRateLimits", () => ({
+  decrementRateLimit: vi.fn(),
+}));
+
 // Default: run the action immediately, as `requireAuth` does when already
 // logged in — every existing test below exercises that path, unchanged
 // from before this mock existed. The one test that cares about the gated
@@ -26,12 +30,14 @@ vi.mock("../auth/authModal", () => ({
 
 import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
 import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 const mockUploadPayslip = vi.mocked(uploadPayslip);
 const mockGetApiErrorMessage = vi.mocked(getApiErrorMessage);
 const mockGetRateLimit = vi.mocked(getRateLimit);
 const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
 const mockRequireAuth = vi.mocked(requireAuth);
+const mockDecrementRateLimit = vi.mocked(decrementRateLimit);
 
 const pdfFile = new File(["contenu"], "bulletin.pdf", { type: "application/pdf" });
 const txtFile = new File(["contenu"], "notes.txt", { type: "text/plain" });
@@ -69,6 +75,7 @@ beforeEach(() => {
   mockRequireAuth.mockReset().mockImplementation((action?: () => void) => {
     action?.();
   });
+  mockDecrementRateLimit.mockReset();
 });
 
 describe("UploadZone", () => {
@@ -122,6 +129,8 @@ describe("UploadZone", () => {
     });
     expect(onUploaded).toHaveBeenCalledWith(payslip);
     expect(mockUploadPayslip).toHaveBeenCalledWith(pdfFile);
+    // A successful upload consumed one hit of the `upload` scope's budget.
+    expect(mockDecrementRateLimit).toHaveBeenCalledWith("upload");
   });
 
   it("shows the backend's error message when the upload fails", async () => {
@@ -135,6 +144,9 @@ describe("UploadZone", () => {
 
     expect(await screen.findByText("Extraction impossible: scan image ?")).toBeInTheDocument();
     expect(onUploaded).not.toHaveBeenCalled();
+    // A failed upload never reached the backend's rate limiter, so nothing
+    // should be decremented locally either.
+    expect(mockDecrementRateLimit).not.toHaveBeenCalled();
   });
 
   it("falls back to a generic message when the backend gives no error detail", async () => {

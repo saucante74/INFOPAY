@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
 import { requireAuth } from "../auth/authModal";
+import { decrementRateLimit } from "../hooks/useRateLimits";
 
 /**
  * `as const satisfies readonly string[]`: `satisfies` checks the contract
@@ -41,6 +42,9 @@ export default function ChatPanel() {
     try {
       const reply = await sendChatMessage(content);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      // See UploadZone.tsx's identical call for why this is a safe local
+      // update rather than a second network round trip.
+      decrementRateLimit("chat");
     } catch (error) {
       const rateLimit = getRateLimit(error);
       setMessages((prev) => [

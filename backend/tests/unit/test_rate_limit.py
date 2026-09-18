@@ -2,6 +2,8 @@
 sliding window is tested without sleeping."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from fastapi import HTTPException
 
@@ -99,3 +101,67 @@ def test_invalid_limit_is_rejected(monkeypatch, value):
     monkeypatch.setenv("RATE_LIMIT_PER_HOUR", value)
     with pytest.raises(RuntimeError, match="RATE_LIMIT_PER_HOUR"):
         get_rate_limit_per_hour()
+
+
+# --- remaining() / limit() / reset_at() ------------------------------------
+# Added for GET /api/rate-limits: these read the same in-memory `_hits`
+# `__call__` already maintains, so there's no second source of truth to
+# keep in sync.
+
+
+def test_remaining_starts_at_the_full_limit():
+    limiter = RateLimit("test", limit=3, clock=FakeClock())
+    assert limiter.remaining() == 3
+
+
+def test_remaining_decreases_with_each_call_and_floors_at_zero():
+    limiter = RateLimit("test", limit=2, clock=FakeClock())
+    limiter()
+    assert limiter.remaining() == 1
+    limiter()
+    assert limiter.remaining() == 0
+    _call_expecting_429(limiter)
+    assert limiter.remaining() == 0  # a rejected call doesn't go negative
+
+
+def test_remaining_does_not_itself_consume_capacity():
+    limiter = RateLimit("test", limit=1, clock=FakeClock())
+    limiter.remaining()
+    limiter.remaining()
+    limiter()  # still allowed: reading remaining() twice used no slot
+
+
+def test_remaining_recovers_as_the_window_slides():
+    clock = FakeClock()
+    limiter = RateLimit("test", limit=1, window_seconds=3600, clock=clock)
+    limiter()
+    assert limiter.remaining() == 0
+    clock.now += 3600
+    assert limiter.remaining() == 1
+
+
+def test_limit_reads_the_env_var_when_not_fixed_at_construction(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "7")
+    limiter = RateLimit("test", clock=FakeClock())
+    assert limiter.limit() == 7
+
+
+def test_reset_at_is_now_when_the_window_is_empty():
+    limiter = RateLimit("test", limit=1, clock=FakeClock())
+    before = datetime.now(UTC)
+    reset_at = limiter.reset_at()
+    after = datetime.now(UTC)
+    assert before <= reset_at <= after
+
+
+def test_reset_at_tracks_the_oldest_hit_expiring():
+    clock = FakeClock()
+    limiter = RateLimit("test", limit=1, window_seconds=3600, clock=clock)
+    limiter()
+
+    delta_now = (limiter.reset_at() - datetime.now(UTC)).total_seconds()
+    assert 3590 < delta_now <= 3600
+
+    clock.now += 1800  # halfway through the window
+    delta_later = (limiter.reset_at() - datetime.now(UTC)).total_seconds()
+    assert 1790 < delta_later <= 1800
