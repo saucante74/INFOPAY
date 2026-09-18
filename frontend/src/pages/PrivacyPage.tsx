@@ -19,7 +19,7 @@ export default function PrivacyPage() {
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="text-2xl font-bold">Politique de confidentialité</h1>
       <p className="mt-1 text-sm text-ink-soft">
-        Dernière mise à jour : [À COMPLÉTER : date de mise à jour]
+        Dernière mise à jour : 17 Septembre 2026
       </p>
 
       <div className="mt-6 space-y-6 rounded-lg border border-border bg-surface-raised p-4">
@@ -111,10 +111,7 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-2 text-sm text-ink-soft">
             Ce traitement par un prestataire situé hors de l'Union européenne peut constituer un
-            transfert de données hors UE au sens du chapitre V du RGPD. [À COMPLÉTER : référence aux
-            garanties contractuelles applicables auprès d'Anthropic, par exemple clauses
-            contractuelles types, si un accord de traitement des données a été signé avec ce
-            prestataire — non vérifiable depuis le code de ce dépôt].
+            transfert de données hors UE au sens du chapitre V du RGPD.
           </p>
         </section>
 
@@ -123,9 +120,7 @@ export default function PrivacyPage() {
           <p className="mt-2 text-sm text-ink-soft">
             En l'état actuel du Service, les bulletins importés et les données qui en sont extraites
             sont conservés indéfiniment : aucune purge automatique ni fonction de suppression
-            accessible à l'utilisateur n'est actuellement implémentée. [À COMPLÉTER : durée de
-            conservation cible, une fois qu'une politique de purge et/ou une fonctionnalité de
-            suppression seront mises en place]. Jusqu'à cette évolution, toute demande de
+            accessible à l'utilisateur n'est actuellement implémentée. Jusqu'à cette évolution, toute demande de
             suppression doit être adressée au responsable de traitement (section 2), qui devra
             intervenir manuellement sur la base de données.
           </p>
@@ -163,14 +158,6 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="text-sm font-semibold text-ink">10. Contact</h2>
-          <p className="mt-2 text-sm text-ink-soft">
-            Pour toute question relative à la présente politique ou pour exercer vos droits : [À
-            COMPLÉTER : adresse e-mail de contact ou du délégué à la protection des données, si
-            applicable].
-          </p>
-        </section>
       </div>
     </div>
   );

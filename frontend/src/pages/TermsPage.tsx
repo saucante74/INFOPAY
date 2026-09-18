@@ -135,17 +135,10 @@ export default function TermsPage() {
           <p className="mt-2 text-sm text-ink-soft">
             Les présentes CGU sont soumises au droit français. À défaut de résolution amiable, tout
             litige relatif à leur interprétation ou leur exécution relève de la compétence exclusive
-            des tribunaux de [À COMPLÉTER : ville du tribunal compétent].
+            des tribunaux compétents.
           </p>
         </section>
 
-        <section>
-          <h2 className="text-sm font-semibold text-ink">10. Contact</h2>
-          <p className="mt-2 text-sm text-ink-soft">
-            Pour toute question relative aux présentes CGU : [À COMPLÉTER : adresse e-mail de
-            contact].
-          </p>
-        </section>
       </div>
     </div>
   );
