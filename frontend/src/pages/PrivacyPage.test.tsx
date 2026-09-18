@@ -4,17 +4,24 @@ import { describe, expect, it } from "vitest";
 import PrivacyPage from "./PrivacyPage";
 
 describe("PrivacyPage", () => {
-  it("renders the page title and every section heading", () => {
+  it("renders the page title and every numbered section heading", () => {
     render(<PrivacyPage />);
 
-    expect(screen.getByRole("heading", { name: "Confidentialité", level: 1 })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Politique de confidentialité", level: 1 })
+    ).toBeInTheDocument();
 
     for (const heading of [
-      "Quelles données sont traitées",
-      "Un service tiers est impliqué dans le traitement",
-      "Où vos données sont stockées",
-      "Aucun système de comptes",
-      "Statut de ce projet",
+      "1. Objet",
+      "2. Responsable de traitement",
+      "3. Données collectées",
+      "4. Finalités du traitement",
+      "5. Base légale du traitement",
+      "6. Destinataires des données",
+      "7. Durée de conservation",
+      "8. Sécurité des données",
+      "9. Vos droits",
+      "10. Contact",
     ]) {
       expect(screen.getByRole("heading", { name: heading, level: 2 })).toBeInTheDocument();
     }
@@ -22,6 +29,17 @@ describe("PrivacyPage", () => {
 
   it("states plainly that data is sent to the Claude API, not processed fully locally", () => {
     render(<PrivacyPage />);
-    expect(screen.getByText(/API Claude d'Anthropic/)).toBeInTheDocument();
+    expect(screen.getByText(/API Claude/)).toBeInTheDocument();
+  });
+
+  it("stays honest about the absence of encryption and authentication", () => {
+    render(<PrivacyPage />);
+    expect(screen.getByText(/sans chiffrement particulier au repos/)).toBeInTheDocument();
+    expect(screen.getByText(/aucun système d'authentification/)).toBeInTheDocument();
+  });
+
+  it("marks the fields requiring real information as explicit placeholders", () => {
+    render(<PrivacyPage />);
+    expect(screen.getAllByText(/\[À COMPLÉTER/).length).toBeGreaterThan(0);
   });
 });

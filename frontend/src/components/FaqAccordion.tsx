@@ -6,6 +6,10 @@ import { ChevronDown } from "lucide-react";
  * answers state only what `extraction.py`, `vectorstore.py` and `upload.py`
  * actually do — no encryption-at-rest or "fully local" claim the backend
  * doesn't back up.
+ *
+ * Content unchanged from the original visual pass — this file's only change
+ * since then is presentational (individual cards instead of a compact
+ * divided list), per the visual-refresh RAPPORT.md.
  */
 const FAQ_ITEMS = [
   {
@@ -62,14 +66,19 @@ const FAQ_ITEMS = [
 
 export default function FaqAccordion() {
   return (
-    <div className="divide-y divide-border">
+    <div className="space-y-4">
       {FAQ_ITEMS.map(({ question, answer }) => (
-        <details key={question} className="group py-3 first:pt-0 last:pb-0">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-ink marker:content-none">
+        <details
+          key={question}
+          className="faq-item group overflow-hidden rounded-lg border border-border bg-surface-raised"
+        >
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-5 py-4 text-base font-semibold text-ink marker:content-none">
             {question}
-            <ChevronDown className="h-4 w-4 shrink-0 text-ink-soft transition-transform group-open:rotate-180" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-ink-soft transition-colors group-open:text-accent">
+              <ChevronDown className="h-4 w-4 transition-transform duration-200 group-open:rotate-180" />
+            </span>
           </summary>
-          <p className="mt-2 text-sm text-ink-soft">{answer}</p>
+          <p className="px-5 pb-5 text-sm leading-relaxed text-ink-soft">{answer}</p>
         </details>
       ))}
     </div>

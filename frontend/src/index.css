@@ -30,6 +30,47 @@ body {
 }
 
 /*
+ * FaqAccordion's open/close transition, CSS-only, no JS.
+ *
+ * `<details>` toggles its content with a hard `display: none ↔ block` —
+ * that can't be animated by transitioning a property on the content
+ * itself, since the element isn't in a transitionable state on the frame
+ * it appears. `::details-content` (the pseudo-element representing that
+ * collapsible region) is the platform's own answer to this, combined with
+ * `transition-behavior: allow-discrete` and `@starting-style` so the
+ * *opening* transition has a defined starting frame instead of jumping
+ * straight to its end state.
+ *
+ * Progressive enhancement: this pseudo-element is a recent addition
+ * (Chromium 131+, not yet in every engine at the time of writing). Browsers
+ * without support simply keep `<details>`'s native instant toggle — same
+ * behavior as before this file existed, nothing breaks either way, and no
+ * JS fallback is needed since the accordion is fully usable without the
+ * animation.
+ */
+.faq-item::details-content {
+  opacity: 0;
+  transform: translateY(-4px);
+  overflow: hidden;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    content-visibility 0.2s allow-discrete;
+}
+
+.faq-item[open]::details-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@starting-style {
+  .faq-item[open]::details-content {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/*
  * Dark mode. Three-layer cascade, in this order:
  *
  *   1. :root (above)                        — light defaults.
