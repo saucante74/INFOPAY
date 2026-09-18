@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
+from app.auth.login_rate_limit import get_login_rate_limit
 from app.auth.router import router as auth_router
 from app.auth.security import get_auth_settings, require_auth
 from app.db import init_db
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # to diagnose than one that refuses to start with a clear message.
     get_auth_settings()
     get_rate_limit_per_hour()
+    get_login_rate_limit()
     init_db()
     yield
 

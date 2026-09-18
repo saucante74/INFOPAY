@@ -6,7 +6,7 @@ import { getApiErrorMessage, login } from "../api/client";
 import { setToken, useAuthToken } from "../auth/tokenStore";
 
 const INPUT_CLASSES =
-  "mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent";
+  "mt-1.5 w-full rounded-md border border-border bg-surface px-4 py-3 text-base text-ink outline-none focus:border-accent";
 
 /**
  * The "/login" route. Once a token exists (just logged in, or already
@@ -38,62 +38,69 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-sm py-8">
-      <h1 className="text-2xl font-bold">Connexion</h1>
-      <p className="mt-1 text-sm text-ink-soft">Connectez-vous pour accéder à l'analyseur.</p>
+    // `flex-1`: `RootLayout`'s `<main>` is itself a flex column, so this is
+    // what actually grows to fill the space between Navbar and Footer —
+    // `justify-center` then centers the card vertically *within that*,
+    // rather than within the whole viewport (which would sit the card
+    // under the navbar instead of the page's true visual center).
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        <h1 className="text-2xl font-bold">Connexion</h1>
+        <p className="mt-1 text-sm text-ink-soft">Connectez-vous pour accéder à l'analyseur.</p>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void handleSubmit();
-        }}
-        className="mt-6 space-y-4 rounded-lg border border-border bg-surface-raised p-5"
-      >
-        <label className="block text-sm font-medium text-ink-soft">
-          Identifiant
-          <input
-            type="text"
-            name="username"
-            autoComplete="username"
-            required
-            value={username}
-            onChange={(e) => {
-              setUsername(e.target.value);
-            }}
-            className={INPUT_CLASSES}
-          />
-        </label>
-
-        <label className="block text-sm font-medium text-ink-soft">
-          Mot de passe
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-            }}
-            className={INPUT_CLASSES}
-          />
-        </label>
-
-        {error && (
-          <p role="alert" className="text-sm text-alert">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
+          className="mt-6 space-y-6 rounded-lg border border-border bg-surface-raised p-8"
         >
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Se connecter
-        </button>
-      </form>
+          <label className="block text-sm font-medium text-ink-soft">
+            Identifiant
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              required
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+              }}
+              className={INPUT_CLASSES}
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-ink-soft">
+            Mot de passe
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+              }}
+              className={INPUT_CLASSES}
+            />
+          </label>
+
+          {error && (
+            <p role="alert" className="text-sm text-alert">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 text-base font-semibold text-white disabled:opacity-60"
+          >
+            {isSubmitting && <Loader2 className="h-5 w-5 animate-spin" />}
+            Se connecter
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

@@ -58,6 +58,7 @@ ADMIN_PASSWORD_HASH='$2b$12$...paste the hash here...'
 JWT_SECRET=...paste the secret here...
 JWT_EXPIRE_HOURS=24        # optional, default 24
 RATE_LIMIT_PER_HOUR=20     # optional, default 20 (see below)
+LOGIN_RATE_LIMIT_PER_15MIN=5   # optional, default 5 (see below)
 ```
 
 > ⚠️ **Keep the single quotes around the hash.** `docker compose` expands
@@ -78,6 +79,14 @@ sliding hour (separate counters). Past it, the API answers `429` with a
 `Retry-After` header and the UI says when to retry. Counters live in memory:
 they reset on restart, and running several uvicorn workers would multiply
 the effective limit (the Dockerfile runs one).
+
+**Login rate limiting.** `POST /api/auth/login` is separately limited to
+`LOGIN_RATE_LIMIT_PER_15MIN` attempts per **client IP** (not a shared
+counter, unlike upload/chat above) in a sliding 15-minute window — a
+global counter would let one attacker lock out the real user by
+exhausting it. This slows down password guessing; it isn't a full
+account-lockout system, and login attempts are not IP-rate-limited by
+anything else (no CAPTCHA, no backoff beyond the 429).
 
 **Removing authentication later.** It is isolated on purpose: delete
 `backend/app/auth/` and the two auth lines in `app/main.py` (the login router

@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.auth.login_rate_limit import login_rate_limit
 from app.auth.security import AuthSettings, get_auth_settings, require_auth
 from app.db import get_session
 from app.dependencies import get_extractor, get_vector_store
@@ -256,9 +257,11 @@ def auth_client(
     # between tests.
     upload_rate_limit.reset()
     chat_rate_limit.reset()
+    login_rate_limit.reset()
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
         upload_rate_limit.reset()
         chat_rate_limit.reset()
+        login_rate_limit.reset()

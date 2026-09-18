@@ -9,8 +9,10 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
+from starlette.requests import Request
 
 import app.agent.graph as graph_mod
 from app.auth.security import AuthConfigError, create_access_token, get_auth_settings
@@ -221,3 +223,116 @@ def test_unauthenticated_requests_do_not_consume_the_budget(
         assert _upload(auth_client, sample_pdf_bytes).status_code == 401
 
     assert _upload(auth_client, sample_pdf_bytes, _bearer(token)).status_code == 200
+
+
+# --- login rate limiting (per IP) ------------------------------------------
+
+
+@pytest.fixture
+def login_limit_of_two(monkeypatch):
+    monkeypatch.setenv("LOGIN_RATE_LIMIT_PER_15MIN", "2")
+
+
+def test_login_rate_limit_rejects_after_the_configured_number_of_attempts(
+    auth_client, credentials, login_limit_of_two
+):
+    wrong = {**credentials, "password": "wrong"}
+    for _ in range(2):
+        assert auth_client.post("/api/auth/login", json=wrong).status_code == 401
+
+    response = auth_client.post("/api/auth/login", json=wrong)
+
+    assert response.status_code == 429
+    assert 800 < int(response.headers["Retry-After"]) <= 900
+    assert "2 tentatives par 15 min" in response.json()["detail"]
+
+
+def test_login_rate_limit_also_applies_to_successful_attempts(
+    auth_client, credentials, login_limit_of_two
+):
+    # A real attacker's requests aren't all failures from the server's point
+    # of view (a lucky guess still counts), so the limiter must not special
+    # -case 200s.
+    for _ in range(2):
+        assert auth_client.post("/api/auth/login", json=credentials).status_code == 200
+
+    assert auth_client.post("/api/auth/login", json=credentials).status_code == 429
+
+
+def test_login_rate_limit_is_independent_per_ip(auth_client, credentials, login_limit_of_two):
+    # This installed version of Starlette's `TestClient` hardcodes
+    # `request.client` to `("testclient", 50000)` with no way to vary it
+    # per instance, so a real end-to-end HTTP call can't simulate a second
+    # IP. `require_login_rate_limit` is called directly instead, with a
+    # hand-built `Request` carrying a different `client` tuple — this still
+    # exercises the real dependency function (including its
+    # `request.client.host` extraction), not just `LoginRateLimit` in
+    # isolation (already covered in tests/unit/test_login_rate_limit.py).
+    from app.auth.login_rate_limit import require_login_rate_limit
+
+    def request_from(ip: str) -> Request:
+        return Request({"type": "http", "client": (ip, 12345), "headers": []})
+
+    for _ in range(2):
+        require_login_rate_limit(request_from("203.0.113.1"))
+    with pytest.raises(HTTPException) as excinfo:
+        require_login_rate_limit(request_from("203.0.113.1"))
+    assert excinfo.value.status_code == 429
+
+    # A different IP is unaffected by 203.0.113.1's exhausted budget — and
+    # confirmed through the real endpoint too, not just the dependency.
+    require_login_rate_limit(request_from("203.0.113.2"))
+    assert auth_client.post("/api/auth/login", json=credentials).status_code == 200
+
+
+def test_login_rate_limit_falls_back_to_a_shared_key_without_a_client(login_limit_of_two):
+    """`request.client` is `None` for some ASGI transports (never uvicorn's
+    real HTTP server) — must not crash the request."""
+    from app.auth.login_rate_limit import login_rate_limit, require_login_rate_limit
+
+    login_rate_limit.reset()
+    no_client_request = Request({"type": "http", "client": None, "headers": []})
+
+    require_login_rate_limit(no_client_request)
+    require_login_rate_limit(no_client_request)
+    with pytest.raises(HTTPException) as excinfo:
+        require_login_rate_limit(no_client_request)
+    assert excinfo.value.status_code == 429
+
+
+def test_login_rate_limit_resets_after_the_window(
+    auth_client, credentials, login_limit_of_two, monkeypatch
+):
+    from app.auth import login_rate_limit as login_rate_limit_mod
+
+    fake_now = [1_000_000.0]
+    monkeypatch.setattr(login_rate_limit_mod.login_rate_limit, "_clock", lambda: fake_now[0])
+
+    wrong = {**credentials, "password": "wrong"}
+    for _ in range(2):
+        assert auth_client.post("/api/auth/login", json=wrong).status_code == 401
+    assert auth_client.post("/api/auth/login", json=wrong).status_code == 429
+
+    fake_now[0] += 900  # exactly one window later
+    assert auth_client.post("/api/auth/login", json=wrong).status_code == 401
+
+
+def test_login_rate_limit_response_is_readable_cross_origin(
+    auth_client, credentials, login_limit_of_two
+):
+    # `access-control-expose-headers` is only sent on the actual response,
+    # not the OPTIONS preflight — so this triggers a real 429 (with the
+    # frontend's own Origin) rather than inspecting a preflight response.
+    # `Retry-After` must be in CORS's `expose_headers` or the browser hides
+    # it from JS — checked here rather than assumed, since it's shared
+    # config in main.py that a future change could silently narrow.
+    origin = {"Origin": "http://localhost:5173"}
+    wrong = {**credentials, "password": "wrong"}
+    for _ in range(2):
+        auth_client.post("/api/auth/login", json=wrong, headers=origin)
+
+    response = auth_client.post("/api/auth/login", json=wrong, headers=origin)
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
+    assert "retry-after" in response.headers["access-control-expose-headers"].lower()

@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from app.auth.login_rate_limit import require_login_rate_limit
 from app.auth.security import (
     AuthSettings,
     create_access_token,
@@ -27,7 +28,7 @@ class TokenResponse(BaseModel):
 
 # A plain `def`, not `async def`: bcrypt is deliberately slow (~0.25 s), and a
 # sync route runs in FastAPI's threadpool instead of blocking the event loop.
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(require_login_rate_limit)])
 def login(
     body: LoginRequest,
     settings: Annotated[AuthSettings, Depends(get_auth_settings)],
