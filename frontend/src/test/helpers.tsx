@@ -1,3 +1,18 @@
+import type { ReactElement } from "react";
+import { render, type RenderResult } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+
+/**
+ * `Navbar` (`NavLink`) and `Footer`/route pages (`Link`) all need a router
+ * context to render at all — real `<BrowserRouter>` would touch
+ * `window.history`, which isn't necessary in a test, so every test wraps
+ * with `MemoryRouter` instead. Centralised here rather than repeated in
+ * every test file that touches routing.
+ */
+export function renderWithRouter(ui: ReactElement, initialEntry = "/"): RenderResult {
+  return render(<MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>);
+}
+
 /**
  * Narrows `value` to non-null/non-undefined via a genuine runtime check
  * that throws with a useful message, rather than a `!` or `as` assertion

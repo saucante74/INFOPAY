@@ -1,6 +1,21 @@
 import { FileText } from "lucide-react";
+import { NavLink } from "react-router";
 
 import ThemeToggle from "./ThemeToggle";
+
+/**
+ * `text-ink`, not `text-accent`, for the active state: the label needs to
+ * stay legible on its own (text-accent on the dark navbar background
+ * measures 3.02:1, short of the 4.5:1 normal-text WCAG threshold — see
+ * RAPPORT.md). The underline carries the accent color instead, alongside
+ * `NavLink`'s own `aria-current="page"` and the bolder weight, so "active"
+ * is never signalled by color alone (WCAG SC 1.4.1).
+ */
+function navLinkClassName({ isActive }: { isActive: boolean }): string {
+  return isActive
+    ? "font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4"
+    : "text-ink-soft transition-colors hover:text-ink";
+}
 
 export default function Navbar() {
   return (
@@ -14,26 +29,14 @@ export default function Navbar() {
         </div>
 
         <nav aria-label="Navigation principale" className="flex items-center gap-6 text-sm">
-          {/* `text-ink`, not `text-accent`: the label needs to stay legible
-              on its own (text-accent on the dark navbar background measures
-              3.02:1, short of the 4.5:1 normal-text WCAG threshold — see
-              RAPPORT.md). The underline carries the accent color instead,
-              alongside `aria-current` and the bolder weight, so "active" is
-              never signalled by color alone (WCAG SC 1.4.1). */}
-          <button
-            type="button"
-            aria-current="page"
-            className="font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4"
-          >
+          {/* `end`: without it, NavLink treats "/" as a prefix match and
+              would also report active on every other route. */}
+          <NavLink to="/" end className={navLinkClassName}>
             Analyseur
-          </button>
-          {/* "Aide" has no destination yet — a real, focusable <button>
-              with no onClick, intentionally, rather than a fake href="#" or
-              a disabled/inert element. See RAPPORT.md, "Navigation without a
-              destination". */}
-          <button type="button" className="text-ink-soft transition-colors hover:text-ink">
+          </NavLink>
+          <NavLink to="/aide" className={navLinkClassName}>
             Aide
-          </button>
+          </NavLink>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">

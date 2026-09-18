@@ -1,33 +1,32 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { renderWithRouter } from "../test/helpers";
 import Footer from "./Footer";
 
 describe("Footer", () => {
   it("renders the copyright line with the current year", () => {
-    render(<Footer />);
+    renderWithRouter(<Footer />);
 
     const year = String(new Date().getFullYear());
     expect(screen.getByText(`© ${year} InfoPay AI. Tous droits réservés.`)).toBeInTheDocument();
   });
 
-  it("renders the three legal/contact links as real, focusable buttons", () => {
-    render(<Footer />);
+  it("renders the two legal links, pointing to their respective pages", () => {
+    renderWithRouter(<Footer />);
 
-    for (const label of ["Confidentialité", "Conditions d'utilisation", "Contact"]) {
-      const link = screen.getByRole("button", { name: label });
-      expect(link).toBeInTheDocument();
-      expect(link).toHaveAccessibleName();
-    }
+    expect(screen.getByRole("link", { name: "Confidentialité" })).toHaveAttribute(
+      "href",
+      "/confidentialite"
+    );
+    expect(screen.getByRole("link", { name: "Conditions d'utilisation" })).toHaveAttribute(
+      "href",
+      "/conditions-utilisation"
+    );
   });
 
-  it("the placeholder links do nothing yet, without throwing", async () => {
-    const user = userEvent.setup();
-    render(<Footer />);
-
-    await expect(
-      user.click(screen.getByRole("button", { name: "Contact" }))
-    ).resolves.not.toThrow();
+  it("no longer renders a 'Contact' link", () => {
+    renderWithRouter(<Footer />);
+    expect(screen.queryByText("Contact")).not.toBeInTheDocument();
   });
 });

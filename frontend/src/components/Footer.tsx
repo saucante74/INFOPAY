@@ -1,16 +1,11 @@
 import { FileText } from "lucide-react";
+import { Link } from "react-router";
 
-/**
- * Same treatment as Navbar's placeholder links, and for the same reason:
- * no /confidentialite, /conditions or /contact page exists in this
- * single-route app. Real `<button>`s, no `onClick` — see RAPPORT.md,
- * "Navigation without a destination".
- */
+/** "Contact" was dropped entirely — no page exists for it, and none is planned. */
 const FOOTER_LINKS = [
-  "Confidentialité",
-  "Conditions d'utilisation",
-  "Contact",
-] as const satisfies readonly string[];
+  { label: "Confidentialité", to: "/confidentialite" },
+  { label: "Conditions d'utilisation", to: "/conditions-utilisation" },
+] as const satisfies readonly { label: string; to: string }[];
 
 export default function Footer() {
   return (
@@ -26,10 +21,10 @@ export default function Footer() {
         </div>
 
         <div className="flex items-center gap-6">
-          {FOOTER_LINKS.map((label) => (
-            <button key={label} type="button" className="transition-colors hover:text-ink">
+          {FOOTER_LINKS.map(({ label, to }) => (
+            <Link key={label} to={to} className="transition-colors hover:text-ink">
               {label}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
