@@ -32,8 +32,22 @@ describe("PayslipTable", () => {
 
   it("renders one row per payslip with formatted amounts", () => {
     const payslips = [
-      makePayslip({ mois_annee: "01/2025", salaire_brut: 3000, net_a_payer: 2300 }),
-      makePayslip({ mois_annee: "02/2025", salaire_brut: 3100, net_a_payer: 2380 }),
+      makePayslip({
+        mois_annee: "01/2025",
+        nom_entreprise: "ACME SARL",
+        salaire_brut: 3000,
+        net_imposable: 2400,
+        net_a_payer: 2300,
+        total_cotisations_patronales: 900,
+      }),
+      makePayslip({
+        mois_annee: "02/2025",
+        nom_entreprise: "Autre Entreprise SAS",
+        salaire_brut: 3100,
+        net_imposable: 2450,
+        net_a_payer: 2380,
+        total_cotisations_patronales: 910,
+      }),
     ];
     render(<PayslipTable payslips={payslips} onDelete={vi.fn()} />);
 
@@ -46,13 +60,26 @@ describe("PayslipTable", () => {
 
     expect(screen.getByText("01/2025")).toBeInTheDocument();
     expect(screen.getByText("02/2025")).toBeInTheDocument();
+    expect(screen.getByText("ACME SARL")).toBeInTheDocument();
     expect(screen.getAllByText(formatEuros(3000), exact)).toHaveLength(1);
+    expect(screen.getAllByText(formatEuros(2400), exact)).toHaveLength(1);
     expect(screen.getAllByText(formatEuros(2300), exact)).toHaveLength(1);
+    expect(screen.getAllByText(formatEuros(900), exact)).toHaveLength(1);
 
     // Column headers are the labels, not the raw backend field names.
     expect(table).toHaveTextContent("Mois");
+    expect(table).toHaveTextContent("Entreprise");
+    expect(table).toHaveTextContent("Net imposable");
     expect(table).toHaveTextContent("Net à payer");
+    expect(table).toHaveTextContent("Cotis. patronales");
     expect(table).toHaveTextContent("Prélèvement source");
+  });
+
+  it("shows a placeholder instead of a blank cell when nom_entreprise is null", () => {
+    const payslip = makePayslip({ mois_annee: "01/2025", nom_entreprise: null });
+    render(<PayslipTable payslips={[payslip]} onDelete={vi.fn()} />);
+
+    expect(screen.getByText("Non renseigné")).toBeInTheDocument();
   });
 
   it("renders a delete button per row, one per payslip", () => {

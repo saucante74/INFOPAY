@@ -14,6 +14,7 @@ export function makePayslip(overrides: Partial<Payslip> = {}): Payslip {
   return {
     id,
     mois_annee: "01/2025",
+    nom_entreprise: "ACME SARL",
     salaire_brut: 3000,
     net_imposable: 2400,
     net_a_payer: 2300,

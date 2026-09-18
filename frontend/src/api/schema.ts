@@ -150,6 +150,8 @@ export interface components {
             id?: number | null;
             /** Mois Annee */
             mois_annee: string;
+            /** Nom Entreprise */
+            nom_entreprise?: string | null;
             /** Salaire Brut */
             salaire_brut: number;
             /** Net Imposable */

@@ -16,9 +16,12 @@ const formatEuros = (value: number): string =>
  */
 const COLUMNS = [
   { key: "mois_annee", label: "Mois" },
+  { key: "nom_entreprise", label: "Entreprise" },
   { key: "salaire_brut", label: "Brut" },
+  { key: "net_imposable", label: "Net imposable" },
   { key: "net_a_payer", label: "Net à payer" },
   { key: "total_cotisations_salariales", label: "Cotis. salariales" },
+  { key: "total_cotisations_patronales", label: "Cotis. patronales" },
   { key: "cotisations_retraite", label: "Retraite" },
   { key: "prelevement_source", label: "Prélèvement source" },
 ] as const satisfies readonly { key: keyof Payslip; label: string }[];
@@ -71,15 +74,19 @@ export default function PayslipTable({ payslips, onDelete }: PayslipTableProps) 
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
-        <table className="w-full text-sm">
+        {/* `text-xs`, not this page's usual `text-sm`: at 9 data columns +
+            actions, `text-sm` needed more width than a 1440px screen has
+            left after the fixed-width chat card — see RAPPORT.md for the
+            exact numbers this was checked against. */}
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border text-left text-ink-soft">
               {COLUMNS.map((col) => (
-                <th key={col.key} className="whitespace-nowrap px-4 py-3 font-medium">
+                <th key={col.key} className="whitespace-nowrap px-2 py-3 font-medium">
                   {col.label}
                 </th>
               ))}
-              <th className="px-4 py-3">
+              <th className="px-2 py-3">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -87,23 +94,44 @@ export default function PayslipTable({ payslips, onDelete }: PayslipTableProps) 
           <tbody>
             {payslips.map((p) => (
               <tr key={p.id} className="border-b border-border last:border-0">
-                <td className="whitespace-nowrap px-4 py-3 font-medium">{p.mois_annee}</td>
-                <td className="tabular whitespace-nowrap px-4 py-3">
+                <td className="whitespace-nowrap px-2 py-3 font-medium">{p.mois_annee}</td>
+                <td
+                  className="max-w-[180px] truncate px-2 py-3"
+                  title={p.nom_entreprise ?? undefined}
+                >
+                  {/* Truncated with an ellipsis + `title` tooltip, unlike
+                      every other (short, fixed-format) column here: a
+                      company name is free text with no length guarantee,
+                      so letting it grow unbounded would force horizontal
+                      scrolling on its own regardless of screen width.
+                      Nullable on rows imported before this field existed
+                      (see models/payslip.py) — shown as a placeholder
+                      rather than an empty cell, so it reads as "unknown"
+                      and not as a rendering bug. */}
+                  {p.nom_entreprise ?? <span className="italic text-ink-soft">Non renseigné</span>}
+                </td>
+                <td className="tabular whitespace-nowrap px-2 py-3">
                   {formatEuros(p.salaire_brut)}
                 </td>
-                <td className="tabular whitespace-nowrap px-4 py-3">
+                <td className="tabular whitespace-nowrap px-2 py-3">
+                  {formatEuros(p.net_imposable)}
+                </td>
+                <td className="tabular whitespace-nowrap px-2 py-3">
                   {formatEuros(p.net_a_payer)}
                 </td>
-                <td className="tabular whitespace-nowrap px-4 py-3">
+                <td className="tabular whitespace-nowrap px-2 py-3">
                   {formatEuros(p.total_cotisations_salariales)}
                 </td>
-                <td className="tabular whitespace-nowrap px-4 py-3">
+                <td className="tabular whitespace-nowrap px-2 py-3">
+                  {formatEuros(p.total_cotisations_patronales)}
+                </td>
+                <td className="tabular whitespace-nowrap px-2 py-3">
                   {formatEuros(p.cotisations_retraite)}
                 </td>
-                <td className="tabular whitespace-nowrap px-4 py-3">
+                <td className="tabular whitespace-nowrap px-2 py-3">
                   {formatEuros(p.prelevement_source)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right">
+                <td className="whitespace-nowrap px-2 py-3 text-right">
                   {p.id != null && (
                     <button
                       type="button"

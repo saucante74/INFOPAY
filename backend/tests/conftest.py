@@ -85,6 +85,7 @@ def blank_pdf_bytes() -> bytes:
 def sample_payslip_extraction() -> PayslipExtraction:
     return PayslipExtraction(
         mois_annee="03/2025",
+        nom_entreprise="ACME SARL",
         salaire_brut=3000.0,
         net_imposable=2400.0,
         net_a_payer=2300.0,

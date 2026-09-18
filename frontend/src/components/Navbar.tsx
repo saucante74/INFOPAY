@@ -24,7 +24,8 @@ export default function Navbar() {
 
   return (
     <header className="border-b border-border bg-surface-raised">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-6 px-4">
+      {/* Matches `RootLayout`'s `<main>` width — see RAPPORT.md. */}
+      <div className="mx-auto flex h-16 w-full max-w-[1800px] items-center gap-6 px-4">
         <div className="flex items-center gap-2">
           {/* `logo-mark.svg`: a genuinely transparent, hand-authored vector
               icon (a document outline + a teal checkmark seal), confirmed

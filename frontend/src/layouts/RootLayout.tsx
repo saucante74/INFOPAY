@@ -21,7 +21,12 @@ export default function RootLayout() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-4">
+      {/* `max-w-[1800px]`, not the old `max-w-7xl` (1280px) — see
+          RAPPORT.md for the 1440/1920 numbers behind this value.
+          Navbar/Footer share it so their edges still line up with
+          `<main>`'s; `AnalyzerPage`'s `[1fr_380px]` grid hands all the
+          gained width to the table, the chat card staying at 380px. */}
+      <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-4 p-4">
         <Outlet />
       </main>
 
