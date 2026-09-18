@@ -1,0 +1,42 @@
+import { screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { renderWithRouter } from "../test/helpers";
+import Navbar from "./Navbar";
+
+describe("Navbar", () => {
+  it("marks 'Analyseur' as the current page on '/'", () => {
+    renderWithRouter(<Navbar />, "/");
+
+    expect(screen.getByText("InfoPay AI")).toBeInTheDocument();
+
+    const analyzer = screen.getByRole("link", { name: "Analyseur" });
+    expect(analyzer).toHaveAttribute("aria-current", "page");
+    expect(analyzer).toHaveAttribute("href", "/");
+
+    const aide = screen.getByRole("link", { name: "Aide" });
+    expect(aide).not.toHaveAttribute("aria-current");
+    expect(aide).toHaveAttribute("href", "/aide");
+  });
+
+  it("marks 'Aide' as the current page on '/aide', not 'Analyseur'", () => {
+    renderWithRouter(<Navbar />, "/aide");
+
+    expect(screen.getByRole("link", { name: "Aide" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Analyseur" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("renders the theme toggle with a clear aria-label", () => {
+    renderWithRouter(<Navbar />);
+
+    // ThemeToggle's own label depends on the resolved theme; asserting an
+    // accessible name exists (rather than a specific one) keeps this test
+    // decoupled from ThemeToggle's own tested behaviour.
+    expect(screen.getByRole("button", { name: /Passer en thème/ })).toBeInTheDocument();
+  });
+
+  it("wraps the nav items in a labelled <nav> landmark", () => {
+    renderWithRouter(<Navbar />);
+    expect(screen.getByRole("navigation", { name: "Navigation principale" })).toBeInTheDocument();
+  });
+});

@@ -1,38 +1,31 @@
-import { FileText } from "lucide-react";
+import { BrowserRouter, Route, Routes } from "react-router";
 
-import ChatPanel from "./components/ChatPanel";
-import PayslipChart from "./components/PayslipChart";
-import PayslipTable from "./components/PayslipTable";
-import UploadZone from "./components/UploadZone";
-import { usePayslips } from "./hooks/usePayslips";
+import RootLayout from "./layouts/RootLayout";
+import AnalyzerPage from "./pages/AnalyzerPage";
+import HelpPage from "./pages/HelpPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
 
+/**
+ * Declarative `<Routes>`/`<Route>` JSX, not `createBrowserRouter`'s config
+ * object: the same "keep the wiring visible" reasoning CONVENTIONS.md
+ * applies to the backend's hand-written LangGraph graph and this frontend's
+ * hand-written ESLint flat config — the route tree should read like a route
+ * tree, not be reconstructed from a data structure.
+ */
 export default function App() {
-  const { payslips, isLoading, addPayslip } = usePayslips();
-
   return (
-    <div className="mx-auto flex h-screen max-w-7xl flex-col gap-4 p-4">
-      <header className="flex items-center gap-2 py-2">
-        <FileText className="h-5 w-5 text-accent" />
-        <h1 className="text-lg font-semibold">InfoPay AI</h1>
-        <span className="text-sm text-ink-soft">— Assistant & Analytics de fiches de paie</span>
-      </header>
-
-      <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[1fr_380px]">
-        <div className="flex flex-col gap-4 overflow-y-auto pr-1">
-          <UploadZone onUploaded={addPayslip} />
-
-          {!isLoading && (
-            <>
-              <PayslipChart payslips={payslips} />
-              <PayslipTable payslips={payslips} />
-            </>
-          )}
-        </div>
-
-        <div className="min-h-0">
-          <ChatPanel />
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<RootLayout />}>
+          <Route index element={<AnalyzerPage />} />
+          <Route path="aide" element={<HelpPage />} />
+          <Route path="confidentialite" element={<PrivacyPage />} />
+          <Route path="conditions-utilisation" element={<TermsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
