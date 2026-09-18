@@ -20,9 +20,7 @@ export default function TermsPage() {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="text-2xl font-bold">Conditions générales d'utilisation</h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        Dernière mise à jour : 17 Septembre 2026
-      </p>
+      <p className="mt-1 text-sm text-ink-soft">Dernière mise à jour : 17 Septembre 2026</p>
 
       <div className="mt-6 space-y-6 rounded-lg border border-border bg-surface-raised p-4">
         <section>
@@ -138,7 +136,6 @@ export default function TermsPage() {
             des tribunaux compétents.
           </p>
         </section>
-
       </div>
     </div>
   );

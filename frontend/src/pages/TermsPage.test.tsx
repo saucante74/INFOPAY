@@ -22,7 +22,6 @@ describe("TermsPage", () => {
       "7. Disponibilité du service",
       "8. Modification des conditions",
       "9. Droit applicable et juridiction",
-      "10. Contact",
     ]) {
       expect(screen.getByRole("heading", { name: heading, level: 2 })).toBeInTheDocument();
     }

@@ -18,9 +18,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="text-2xl font-bold">Politique de confidentialité</h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        Dernière mise à jour : 17 Septembre 2026
-      </p>
+      <p className="mt-1 text-sm text-ink-soft">Dernière mise à jour : 17 Septembre 2026</p>
 
       <div className="mt-6 space-y-6 rounded-lg border border-border bg-surface-raised p-4">
         <section>
@@ -97,7 +95,7 @@ export default function PrivacyPage() {
             Le traitement repose sur le consentement de l'utilisateur (article 6.1.a du RGPD),
             matérialisé par l'action volontaire d'importer un bulletin de paie dans le Service. Ce
             consentement peut être retiré à tout moment en cessant d'utiliser le Service ; voir la
-            section 10 pour l'exercice de vos droits sur les données déjà importées.
+            section 9 pour l'exercice de vos droits sur les données déjà importées.
           </p>
         </section>
 
@@ -120,9 +118,9 @@ export default function PrivacyPage() {
           <p className="mt-2 text-sm text-ink-soft">
             En l'état actuel du Service, les bulletins importés et les données qui en sont extraites
             sont conservés indéfiniment : aucune purge automatique ni fonction de suppression
-            accessible à l'utilisateur n'est actuellement implémentée. Jusqu'à cette évolution, toute demande de
-            suppression doit être adressée au responsable de traitement (section 2), qui devra
-            intervenir manuellement sur la base de données.
+            accessible à l'utilisateur n'est actuellement implémentée. Jusqu'à cette évolution,
+            toute demande de suppression doit être adressée au responsable de traitement (section
+            2), qui devra intervenir manuellement sur la base de données.
           </p>
         </section>
 
@@ -157,7 +155,6 @@ export default function PrivacyPage() {
             vous estimez que le traitement de vos données constitue une violation du RGPD.
           </p>
         </section>
-
       </div>
     </div>
   );

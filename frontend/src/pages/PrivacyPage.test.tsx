@@ -21,7 +21,6 @@ describe("PrivacyPage", () => {
       "7. Durée de conservation",
       "8. Sécurité des données",
       "9. Vos droits",
-      "10. Contact",
     ]) {
       expect(screen.getByRole("heading", { name: heading, level: 2 })).toBeInTheDocument();
     }
@@ -36,10 +35,5 @@ describe("PrivacyPage", () => {
     render(<PrivacyPage />);
     expect(screen.getByText(/sans chiffrement particulier au repos/)).toBeInTheDocument();
     expect(screen.getByText(/aucun système d'authentification/)).toBeInTheDocument();
-  });
-
-  it("marks the fields requiring real information as explicit placeholders", () => {
-    render(<PrivacyPage />);
-    expect(screen.getAllByText(/\[À COMPLÉTER/).length).toBeGreaterThan(0);
   });
 });
