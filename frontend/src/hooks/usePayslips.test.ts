@@ -12,14 +12,17 @@ import { usePayslips } from "./usePayslips";
 
 vi.mock("../api/client", () => ({
   fetchPayslips: vi.fn(),
+  deletePayslip: vi.fn(),
 }));
 
-import { fetchPayslips } from "../api/client";
+import { deletePayslip, fetchPayslips } from "../api/client";
 
 const mockFetchPayslips = vi.mocked(fetchPayslips);
+const mockDeletePayslip = vi.mocked(deletePayslip);
 
 beforeEach(() => {
   mockFetchPayslips.mockReset();
+  mockDeletePayslip.mockReset();
 });
 
 // localStorage (and therefore the token) is cleared after each test by
@@ -117,5 +120,46 @@ describe("usePayslips", () => {
 
     expect(result.current.payslips.map((p) => p.mois_annee)).toEqual(["01/2025", "02/2025"]);
     expect(mockFetchPayslips).toHaveBeenCalledTimes(1);
+  });
+
+  it("removePayslip deletes on the server then removes the row locally, without refetching", async () => {
+    setToken("jwt.token.value");
+    const toDelete = makePayslip({ id: 7, mois_annee: "01/2025" });
+    const other = makePayslip({ id: 8, mois_annee: "02/2025" });
+    mockFetchPayslips.mockResolvedValueOnce([toDelete, other]);
+    mockDeletePayslip.mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => usePayslips());
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.removePayslip(7);
+    });
+
+    expect(mockDeletePayslip).toHaveBeenCalledWith(7);
+    expect(result.current.payslips.map((p) => p.mois_annee)).toEqual(["02/2025"]);
+    expect(mockFetchPayslips).toHaveBeenCalledTimes(1);
+  });
+
+  it("removePayslip rejects and leaves the local list unchanged when the server call fails", async () => {
+    setToken("jwt.token.value");
+    const payslip = makePayslip({ id: 7, mois_annee: "01/2025" });
+    mockFetchPayslips.mockResolvedValueOnce([payslip]);
+    mockDeletePayslip.mockRejectedValueOnce(new Error("network down"));
+
+    const { result } = renderHook(() => usePayslips());
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.removePayslip(7);
+      })
+    ).rejects.toThrow("network down");
+
+    expect(result.current.payslips.map((p) => p.mois_annee)).toEqual(["01/2025"]);
   });
 });

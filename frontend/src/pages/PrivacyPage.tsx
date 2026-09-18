@@ -116,11 +116,11 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-sm font-semibold text-ink">7. Durée de conservation</h2>
           <p className="mt-2 text-sm text-ink-soft">
-            En l'état actuel du Service, les bulletins importés et les données qui en sont extraites
-            sont conservés indéfiniment : aucune purge automatique ni fonction de suppression
-            accessible à l'utilisateur n'est actuellement implémentée. Jusqu'à cette évolution,
-            toute demande de suppression doit être adressée au responsable de traitement (section
-            2), qui devra intervenir manuellement sur la base de données.
+            Chaque bulletin peut être supprimé individuellement par l'utilisateur, depuis le tableau
+            récapitulatif de l'analyseur : la suppression retire à la fois l'enregistrement en base
+            et son contenu indexé pour l'assistant. En dehors de cette action volontaire, aucune
+            purge automatique n'est en place : un bulletin non supprimé explicitement est conservé
+            indéfiniment.
           </p>
         </section>
 

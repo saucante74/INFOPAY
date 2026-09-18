@@ -6,7 +6,7 @@ import { usePayslips } from "../hooks/usePayslips";
 
 /** The app's home route ("/") — unchanged content, previously inlined in `App.tsx`. */
 export default function AnalyzerPage() {
-  const { payslips, isLoading, addPayslip } = usePayslips();
+  const { payslips, isLoading, addPayslip, removePayslip } = usePayslips();
 
   return (
     <>
@@ -24,7 +24,7 @@ export default function AnalyzerPage() {
           {!isLoading && (
             <>
               <PayslipChart payslips={payslips} />
-              <PayslipTable payslips={payslips} />
+              <PayslipTable payslips={payslips} onDelete={removePayslip} />
             </>
           )}
         </div>

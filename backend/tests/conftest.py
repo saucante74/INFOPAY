@@ -131,6 +131,7 @@ class FakeVectorStore:
 
     def __init__(self) -> None:
         self.indexed: list[tuple[int, str]] = []
+        self.deleted: list[int] = []
         self.hits: list[dict] = [
             {"text": "La CSG déductible est assise sur le salaire brut.", "mois_annee": "03/2025"}
         ]
@@ -140,6 +141,9 @@ class FakeVectorStore:
 
     def search(self, query: str, n_results: int = 3) -> list[dict]:
         return self.hits
+
+    def delete(self, payslip_id: int) -> None:
+        self.deleted.append(payslip_id)
 
 
 @pytest.fixture
@@ -265,3 +269,13 @@ def auth_client(
         upload_rate_limit.reset()
         chat_rate_limit.reset()
         login_rate_limit.reset()
+
+
+@pytest.fixture
+def token(auth_client: TestClient, credentials: dict[str, str]) -> str:
+    """A real, valid JWT for `auth_client`'s account -- shared across test
+    modules that need to call a protected endpoint through `auth_client`
+    (as opposed to `client`, which bypasses auth entirely)."""
+    response = auth_client.post("/api/auth/login", json=credentials)
+    assert response.status_code == 200
+    return str(response.json()["access_token"])

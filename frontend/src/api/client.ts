@@ -34,6 +34,11 @@ export async function fetchPayslips(): Promise<Payslip[]> {
   return data;
 }
 
+/** Rejects with a 404 (via the underlying axios error) if `id` doesn't exist. */
+export async function deletePayslip(id: number): Promise<void> {
+  await api.delete(`/api/payslips/${String(id)}`);
+}
+
 export async function sendChatMessage(message: string): Promise<string> {
   const { data } = await api.post<ChatResponse>("/api/chat", { message });
   return data.reply;

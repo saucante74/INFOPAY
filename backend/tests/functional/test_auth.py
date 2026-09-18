@@ -31,13 +31,6 @@ def fake_llm(monkeypatch):
     monkeypatch.setattr(graph_mod, "_llm", _AlwaysAnswersLLM())
 
 
-@pytest.fixture
-def token(auth_client, credentials) -> str:
-    response = auth_client.post("/api/auth/login", json=credentials)
-    assert response.status_code == 200
-    return response.json()["access_token"]
-
-
 def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 

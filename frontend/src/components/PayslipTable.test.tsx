@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { makePayslip } from "../test/fixtures";
 import PayslipTable from "./PayslipTable";
@@ -23,7 +24,7 @@ const exact = { normalizer: (text: string): string => text };
 
 describe("PayslipTable", () => {
   it("shows the empty-state message and no table when there are no payslips", () => {
-    render(<PayslipTable payslips={[]} />);
+    render(<PayslipTable payslips={[]} onDelete={vi.fn()} />);
 
     expect(screen.getByText(/Aucun bulletin importé/)).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
@@ -34,7 +35,7 @@ describe("PayslipTable", () => {
       makePayslip({ mois_annee: "01/2025", salaire_brut: 3000, net_a_payer: 2300 }),
       makePayslip({ mois_annee: "02/2025", salaire_brut: 3100, net_a_payer: 2380 }),
     ];
-    render(<PayslipTable payslips={payslips} />);
+    render(<PayslipTable payslips={payslips} onDelete={vi.fn()} />);
 
     expect(screen.queryByText(/Aucun bulletin importé/)).not.toBeInTheDocument();
 
@@ -52,5 +53,80 @@ describe("PayslipTable", () => {
     expect(table).toHaveTextContent("Mois");
     expect(table).toHaveTextContent("Net à payer");
     expect(table).toHaveTextContent("Prélèvement source");
+  });
+
+  it("renders a delete button per row, one per payslip", () => {
+    const payslips = [
+      makePayslip({ mois_annee: "01/2025" }),
+      makePayslip({ mois_annee: "02/2025" }),
+    ];
+    render(<PayslipTable payslips={payslips} onDelete={vi.fn()} />);
+
+    expect(
+      screen.getByRole("button", { name: "Supprimer le bulletin de 01/2025" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Supprimer le bulletin de 02/2025" })
+    ).toBeInTheDocument();
+  });
+
+  it("clicking the delete icon asks for confirmation before calling onDelete", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const payslip = makePayslip({ mois_annee: "01/2025" });
+    render(<PayslipTable payslips={[payslip]} onDelete={onDelete} />);
+
+    await user.click(screen.getByRole("button", { name: "Supprimer le bulletin de 01/2025" }));
+
+    expect(screen.getByRole("dialog", { name: "Supprimer ce bulletin ?" })).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("cancelling the confirmation does not call onDelete and keeps the row", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const payslip = makePayslip({ mois_annee: "01/2025" });
+    render(<PayslipTable payslips={[payslip]} onDelete={onDelete} />);
+
+    await user.click(screen.getByRole("button", { name: "Supprimer le bulletin de 01/2025" }));
+    await user.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByText("01/2025")).toBeInTheDocument();
+  });
+
+  it("confirming calls onDelete with the row's id and closes the dialog on success", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const payslip = makePayslip({ id: 42, mois_annee: "01/2025" });
+    render(<PayslipTable payslips={[payslip]} onDelete={onDelete} />);
+
+    await user.click(screen.getByRole("button", { name: "Supprimer le bulletin de 01/2025" }));
+    await user.click(screen.getByRole("button", { name: "Supprimer" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(42);
+  });
+
+  it("shows a clear error message, without crashing, when the deletion fails", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockRejectedValue(new Error("network down"));
+    const payslip = makePayslip({ mois_annee: "01/2025" });
+    render(<PayslipTable payslips={[payslip]} onDelete={onDelete} />);
+
+    await user.click(screen.getByRole("button", { name: "Supprimer le bulletin de 01/2025" }));
+    await user.click(screen.getByRole("button", { name: "Supprimer" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "La suppression du bulletin de 01/2025 a échoué. Réessayez."
+    );
+    // The dialog stays open and the row is still there — a failed delete
+    // doesn't silently drop the payslip from view.
+    expect(screen.getByRole("dialog", { name: "Supprimer ce bulletin ?" })).toBeInTheDocument();
+    expect(screen.getByText("01/2025")).toBeInTheDocument();
   });
 });

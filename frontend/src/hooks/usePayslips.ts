@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchPayslips } from "../api/client";
+import { deletePayslip, fetchPayslips } from "../api/client";
 import type { Payslip } from "../api/types";
 import { useAuthToken } from "../auth/tokenStore";
 
@@ -9,6 +9,13 @@ interface UsePayslipsResult {
   isLoading: boolean;
   /** Appends a payslip that was just uploaded, without refetching the list. */
   addPayslip: (payslip: Payslip) => void;
+  /**
+   * Deletes a payslip on the server, then removes it from local state —
+   * only on success, so a failed delete leaves the row exactly where it
+   * was rather than optimistically disappearing. Rejects on failure; the
+   * caller (`PayslipTable`) is the one with a UI to show that in.
+   */
+  removePayslip: (id: number) => Promise<void>;
 }
 
 const EMPTY_PAYSLIPS: readonly Payslip[] = [];
@@ -61,12 +68,17 @@ export function usePayslips(): UsePayslipsResult {
     setPayslips((prev) => [...prev, payslip]);
   }, []);
 
+  const removePayslip = useCallback(async (id: number) => {
+    await deletePayslip(id);
+    setPayslips((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   // Logged out: always report empty/not-loading, regardless of what's left
   // in state from a previous session (logout, or a 401 mid-session) —
   // there's never a moment where stale data briefly shows for a
   // now-unauthenticated visitor.
   if (!token) {
-    return { payslips: EMPTY_PAYSLIPS, isLoading: false, addPayslip };
+    return { payslips: EMPTY_PAYSLIPS, isLoading: false, addPayslip, removePayslip };
   }
-  return { payslips, isLoading: loadedForToken !== token, addPayslip };
+  return { payslips, isLoading: loadedForToken !== token, addPayslip, removePayslip };
 }
