@@ -1,6 +1,9 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { getToken, setToken } from "../auth/tokenStore";
 import { renderWithRouter } from "../test/helpers";
 import Navbar from "./Navbar";
 
@@ -38,5 +41,31 @@ describe("Navbar", () => {
   it("wraps the nav items in a labelled <nav> landmark", () => {
     renderWithRouter(<Navbar />);
     expect(screen.getByRole("navigation", { name: "Navigation principale" })).toBeInTheDocument();
+  });
+
+  it("shows no logout button when logged out", () => {
+    renderWithRouter(<Navbar />);
+    expect(screen.queryByRole("button", { name: "Se déconnecter" })).not.toBeInTheDocument();
+  });
+
+  it("logs out and goes to /login from the logout button", async () => {
+    const user = userEvent.setup();
+    setToken("jwt.token.value");
+    renderWithRouter(
+      <>
+        <Navbar />
+        <Routes>
+          <Route path="/login" element={<p>Page de connexion</p>} />
+          <Route path="*" element={null} />
+        </Routes>
+      </>,
+      "/aide"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+
+    expect(getToken()).toBeNull();
+    expect(screen.getByText("Page de connexion")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Se déconnecter" })).not.toBeInTheDocument();
   });
 });

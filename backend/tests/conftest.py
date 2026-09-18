@@ -11,16 +11,21 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from datetime import timedelta
+
+import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.auth.security import AuthSettings, get_auth_settings, require_auth
 from app.db import get_session
 from app.dependencies import get_extractor, get_vector_store
 from app.interfaces import Extractor, VectorStore
 from app.main import app
 from app.models.payslip import PayslipExtraction
+from app.rate_limit import chat_rate_limit, upload_rate_limit
 
 # ---------------------------------------------------------------------------
 # PDF fixtures
@@ -165,8 +170,9 @@ def test_engine():
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def _overridden_app(test_engine, fake_extractor: Extractor, fake_vector_store: VectorStore):
+def _override_business_dependencies(
+    test_engine, fake_extractor: Extractor, fake_vector_store: VectorStore
+) -> None:
     def _session_override() -> Iterator[Session]:
         with Session(test_engine) as session:
             yield session
@@ -174,6 +180,16 @@ def _overridden_app(test_engine, fake_extractor: Extractor, fake_vector_store: V
     app.dependency_overrides[get_session] = _session_override
     app.dependency_overrides[get_extractor] = lambda: fake_extractor
     app.dependency_overrides[get_vector_store] = lambda: fake_vector_store
+
+
+@pytest.fixture
+def _overridden_app(test_engine, fake_extractor: Extractor, fake_vector_store: VectorStore):
+    """The app with auth and rate limiting bypassed: business tests stay
+    about business behaviour. Both are exercised for real by `auth_client`."""
+    _override_business_dependencies(test_engine, fake_extractor, fake_vector_store)
+    app.dependency_overrides[require_auth] = lambda: TEST_USERNAME
+    app.dependency_overrides[upload_rate_limit] = lambda: None
+    app.dependency_overrides[chat_rate_limit] = lambda: None
     try:
         yield app
     finally:
@@ -197,3 +213,52 @@ def client_no_raise(_overridden_app) -> TestClient:
     route (utile pour vérifier qu'un endpoint sans try/except renvoie bien
     une 500 plutôt que de planter le test)."""
     return TestClient(_overridden_app, raise_server_exceptions=False)
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+TEST_USERNAME = "admin"
+TEST_PASSWORD = "correct horse battery staple"
+
+
+@pytest.fixture(scope="session")
+def credentials() -> dict[str, str]:
+    """The account `auth_settings` accepts, as a login request body."""
+    return {"username": TEST_USERNAME, "password": TEST_PASSWORD}
+
+
+@pytest.fixture(scope="session")
+def auth_settings() -> AuthSettings:
+    # rounds=4, bcrypt's minimum: the hash is still real, just cheap to
+    # verify, so the suite doesn't pay ~0.25 s per login test.
+    return AuthSettings(
+        username=TEST_USERNAME,
+        password_hash=bcrypt.hashpw(TEST_PASSWORD.encode(), bcrypt.gensalt(rounds=4)),
+        jwt_secret="test-secret-" + "x" * 40,
+        token_ttl=timedelta(hours=24),
+    )
+
+
+@pytest.fixture
+def auth_client(
+    test_engine,
+    fake_extractor: Extractor,
+    fake_vector_store: VectorStore,
+    auth_settings: AuthSettings,
+) -> Iterator[TestClient]:
+    """Real `require_auth` and real rate limiters; only the settings (which
+    would otherwise come from the environment) are substituted."""
+    _override_business_dependencies(test_engine, fake_extractor, fake_vector_store)
+    app.dependency_overrides[get_auth_settings] = lambda: auth_settings
+    # The limiters are module-level singletons: reset so no count leaks
+    # between tests.
+    upload_rate_limit.reset()
+    chat_rate_limit.reset()
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+        upload_rate_limit.reset()
+        chat_rate_limit.reset()

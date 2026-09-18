@@ -6,11 +6,15 @@ import ChatPanel from "./ChatPanel";
 
 vi.mock("../api/client", () => ({
   sendChatMessage: vi.fn(),
+  getRateLimit: vi.fn(),
+  formatRetryDelay: vi.fn(),
 }));
 
-import { sendChatMessage } from "../api/client";
+import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
 
 const mockSendChatMessage = vi.mocked(sendChatMessage);
+const mockGetRateLimit = vi.mocked(getRateLimit);
+const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
@@ -26,6 +30,8 @@ function getSubmitButton(): HTMLElement {
 
 beforeEach(() => {
   mockSendChatMessage.mockReset();
+  mockGetRateLimit.mockReset();
+  mockFormatRetryDelay.mockReset();
 });
 
 describe("ChatPanel", () => {
@@ -92,6 +98,28 @@ describe("ChatPanel", () => {
         "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé."
       )
     ).toBeInTheDocument();
+  });
+
+  it("shows a specific message when the hourly question limit is reached", async () => {
+    const user = userEvent.setup();
+    mockSendChatMessage.mockRejectedValueOnce(new Error("429"));
+    mockGetRateLimit.mockReturnValueOnce({ retryAfterMinutes: 5 });
+    mockFormatRetryDelay.mockReturnValueOnce("dans 5 min");
+    render(<ChatPanel />);
+
+    const input = screen.getByPlaceholderText("Posez une question sur vos bulletins…");
+    await user.type(input, "Une question{enter}");
+
+    expect(
+      await screen.findByText(
+        "Limite de questions atteinte pour cette heure. Réessayez dans 5 min."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé."
+      )
+    ).not.toBeInTheDocument();
   });
 
   it("does not send an empty or whitespace-only message", async () => {

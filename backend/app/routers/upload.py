@@ -7,12 +7,13 @@ from app.db import get_session
 from app.dependencies import get_extractor, get_vector_store
 from app.interfaces import Extractor, VectorStore
 from app.models.payslip import Payslip
+from app.rate_limit import upload_rate_limit
 from app.services.extraction import extract_text_from_pdf
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(upload_rate_limit)])
 async def upload_payslip(
     file: UploadFile,
     session: Session = Depends(get_session),

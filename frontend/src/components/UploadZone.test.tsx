@@ -9,12 +9,16 @@ import UploadZone from "./UploadZone";
 vi.mock("../api/client", () => ({
   uploadPayslip: vi.fn(),
   getApiErrorMessage: vi.fn(),
+  getRateLimit: vi.fn(),
+  formatRetryDelay: vi.fn(),
 }));
 
-import { getApiErrorMessage, uploadPayslip } from "../api/client";
+import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
 
 const mockUploadPayslip = vi.mocked(uploadPayslip);
 const mockGetApiErrorMessage = vi.mocked(getApiErrorMessage);
+const mockGetRateLimit = vi.mocked(getRateLimit);
+const mockFormatRetryDelay = vi.mocked(formatRetryDelay);
 
 const pdfFile = new File(["contenu"], "bulletin.pdf", { type: "application/pdf" });
 const txtFile = new File(["contenu"], "notes.txt", { type: "text/plain" });
@@ -47,6 +51,8 @@ function deferred<T>(): {
 beforeEach(() => {
   mockUploadPayslip.mockReset();
   mockGetApiErrorMessage.mockReset();
+  mockGetRateLimit.mockReset();
+  mockFormatRetryDelay.mockReset();
 });
 
 describe("UploadZone", () => {
@@ -128,6 +134,22 @@ describe("UploadZone", () => {
         "L'extraction a échoué. Vérifiez que le PDF est bien un bulletin de paie lisible."
       )
     ).toBeInTheDocument();
+  });
+
+  it("shows a specific message when the hourly upload limit is reached", async () => {
+    const user = userEvent.setup();
+    mockUploadPayslip.mockRejectedValueOnce(new Error("429"));
+    mockGetRateLimit.mockReturnValueOnce({ retryAfterMinutes: 12 });
+    mockFormatRetryDelay.mockReturnValueOnce("dans 12 min");
+    render(<UploadZone onUploaded={vi.fn()} />);
+
+    await user.upload(getInput(), pdfFile);
+
+    expect(
+      await screen.findByText("Limite d'imports atteinte pour cette heure. Réessayez dans 12 min.")
+    ).toBeInTheDocument();
+    // The rate-limit message wins over the backend's generic detail.
+    expect(mockGetApiErrorMessage).not.toHaveBeenCalled();
   });
 
   it("uploads a PDF dropped onto the zone", async () => {

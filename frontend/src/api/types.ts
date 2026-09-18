@@ -20,6 +20,12 @@ export type Payslip = components["schemas"]["Payslip"];
 /** Reply envelope of `POST /api/chat`. */
 export type ChatResponse = components["schemas"]["ChatResponse"];
 
+/** Body of `POST /api/auth/login`. */
+export type LoginRequest = components["schemas"]["LoginRequest"];
+
+/** Reply of `POST /api/auth/login`. */
+export type TokenResponse = components["schemas"]["TokenResponse"];
+
 /**
  * FastAPI's error body.
  *

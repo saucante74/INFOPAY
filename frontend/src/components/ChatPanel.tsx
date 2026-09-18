@@ -1,7 +1,7 @@
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { sendChatMessage } from "../api/client";
+import { formatRetryDelay, getRateLimit, sendChatMessage } from "../api/client";
 
 /**
  * `as const satisfies readonly string[]`: `satisfies` checks the contract
@@ -43,13 +43,15 @@ export default function ChatPanel() {
     try {
       const reply = await sendChatMessage(content);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
+    } catch (error) {
+      const rateLimit = getRateLimit(error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content:
-            "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
+          content: rateLimit
+            ? `Limite de questions atteinte pour cette heure. Réessayez ${formatRetryDelay(rateLimit)}.`
+            : "Désolé, une erreur est survenue. Vérifiez que le serveur backend est bien lancé.",
         },
       ]);
     } finally {

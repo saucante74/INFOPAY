@@ -1,7 +1,7 @@
 import { FileUp, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { getApiErrorMessage, uploadPayslip } from "../api/client";
+import { formatRetryDelay, getApiErrorMessage, getRateLimit, uploadPayslip } from "../api/client";
 import type { Payslip } from "../api/types";
 
 /**
@@ -41,11 +41,13 @@ export default function UploadZone({ onUploaded }: UploadZoneProps) {
         setUpload({ status: "idle" });
         onUploaded(payslip);
       } catch (error) {
+        const rateLimit = getRateLimit(error);
         setUpload({
           status: "error",
-          message:
-            getApiErrorMessage(error) ??
-            "L'extraction a échoué. Vérifiez que le PDF est bien un bulletin de paie lisible.",
+          message: rateLimit
+            ? `Limite d'imports atteinte pour cette heure. Réessayez ${formatRetryDelay(rateLimit)}.`
+            : (getApiErrorMessage(error) ??
+              "L'extraction a échoué. Vérifiez que le PDF est bien un bulletin de paie lisible."),
         });
       }
     },

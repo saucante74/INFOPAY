@@ -13,17 +13,79 @@ source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env and paste your ANTHROPIC_API_KEY
+# edit .env: paste your ANTHROPIC_API_KEY and set up the login account
+# (see "Authentication" below — the server refuses to start without it)
 
 uvicorn app.main:app --reload --port 8000
 ```
 
 Health check: `http://localhost:8000/api/health` should return `{"status": "ok"}`.
 Interactive docs: `http://localhost:8000/docs` — useful to test `/api/upload`
-(with a real PDF) and `/api/chat` without waiting on the frontend.
+(with a real PDF) and `/api/chat` without waiting on the frontend. Call
+`POST /api/auth/login` first, then paste the `access_token` into the
+**Authorize** button (top right).
 
 > Requires Python 3.12. ChromaDB does not currently support Python 3.14
 > (native dependency build failures) — see the note at the bottom.
+
+## Authentication
+
+The whole API (`/api/upload`, `/api/payslips`, `/api/chat`) requires a JWT,
+obtained from `POST /api/auth/login` with a single account defined in
+`backend/.env` — there is no users table. `/api/health` stays public.
+
+**1. Hash the password** (never store it in clear, not even in `.env`). The
+prompt hides what you type and keeps it out of your shell history:
+
+```bash
+cd backend && source venv/bin/activate
+python -c "import bcrypt, getpass; print(bcrypt.hashpw(getpass.getpass('Mot de passe : ').encode(), bcrypt.gensalt()).decode())"
+```
+
+bcrypt only uses the first 72 bytes of a password; longer ones are refused.
+
+**2. Generate the token-signing secret:**
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+**3. Put both in `backend/.env`:**
+
+```dotenv
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH='$2b$12$...paste the hash here...'
+JWT_SECRET=...paste the secret here...
+JWT_EXPIRE_HOURS=24        # optional, default 24
+RATE_LIMIT_PER_HOUR=20     # optional, default 20 (see below)
+```
+
+> ⚠️ **Keep the single quotes around the hash.** `docker compose` expands
+> `$` in `env_file` values: unquoted (or double-quoted), `$2b$12$abc…`
+> reaches the container as just `$2b$12`, and every login fails. The
+> backend checks for this and refuses to start with an explicit message
+> rather than rejecting logins silently.
+
+The backend validates all of this **at startup**: a missing variable, a
+malformed hash or a secret shorter than 32 characters stops the server with
+a message naming the variable. Changing the password means generating a new
+hash and restarting; changing `JWT_SECRET` or `ADMIN_USERNAME` also logs
+out every open session.
+
+**Rate limiting.** `/api/upload` and `/api/chat` call the Anthropic API and
+cost money, so each is limited to `RATE_LIMIT_PER_HOUR` requests per
+sliding hour (separate counters). Past it, the API answers `429` with a
+`Retry-After` header and the UI says when to retry. Counters live in memory:
+they reset on restart, and running several uvicorn workers would multiply
+the effective limit (the Dockerfile runs one).
+
+**Removing authentication later.** It is isolated on purpose: delete
+`backend/app/auth/` and the two auth lines in `app/main.py` (the login router
+and `dependencies=_authenticated`); on the frontend, delete `src/auth/` and
+`src/pages/LoginPage.tsx`, then remove the `attachAuth(api)` call in
+`src/api/client.ts`, the `/login` route and `<RequireAuth>` wrapper in
+`App.tsx`, and the logout button in `Navbar.tsx`. Rate limiting
+(`app/rate_limit.py`) is independent and can stay.
 
 ## Frontend setup
 
@@ -34,8 +96,13 @@ cp .env.example .env   # VITE_API_URL, defaults to http://localhost:8000
 npm run dev
 ```
 
-Open `http://localhost:5173`. The frontend expects the backend to be running
-on port 8000 (locally or via Docker).
+Open `http://localhost:5173` — you land on `/login` until you sign in with
+the account from `backend/.env`. The frontend expects the backend to be
+running on port 8000 (locally or via Docker).
+
+The JWT is kept in `localStorage` and sent as `Authorization: Bearer` by an
+axios interceptor (`src/auth/attachAuth.ts`); any `401` logs the user out and
+redirects to `/login`. Help and the legal pages stay public.
 
 The frontend is **TypeScript** (strict). Useful commands:
 
@@ -64,7 +131,8 @@ separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 - ChromaDB vector indexing (local embeddings, no external API needed for that)
 - Pandas analytics engine (sum/average/min/max over the last N months)
 - 2-node LangGraph graph (agent + tools) routed via Claude tool-calling
-- `/api/upload`, `/api/payslips`, `/api/chat` endpoints
+- `/api/upload`, `/api/payslips`, `/api/chat` endpoints, behind single-account
+  JWT authentication, with per-hour rate limiting on upload and chat
 - React + TypeScript frontend (strict, no `any`): drag & drop upload,
   summary table, evolution chart, chat — with API types generated from the
   backend's OpenAPI schema
@@ -74,9 +142,14 @@ separate `tailwind.config.js` — that's the new Tailwind 4 approach).
 
 ```bash
 # From the project root
-cp backend/.env.example backend/.env   # then paste your API key
+cp backend/.env.example backend/.env   # then paste your API key and set up
+                                       # the account (see "Authentication")
 docker compose up --build
 ```
+
+If the backend container exits immediately, `docker compose logs backend`
+names the missing or malformed variable — most often an unquoted
+`ADMIN_PASSWORD_HASH`.
 
 The first build takes a few minutes (langchain, langgraph, chromadb are heavy
 dependencies). Data (SQLite + ChromaDB) is persisted on the host in

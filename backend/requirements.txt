@@ -10,3 +10,5 @@ langchain==0.3.7
 langchain-anthropic==0.2.4
 langgraph==0.2.45
 python-dotenv==1.0.1
+bcrypt==5.0.0
+PyJWT==2.14.0

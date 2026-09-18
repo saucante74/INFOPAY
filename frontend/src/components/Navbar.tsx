@@ -1,6 +1,7 @@
-import { FileText } from "lucide-react";
-import { NavLink } from "react-router";
+import { FileText, LogOut } from "lucide-react";
+import { NavLink, useNavigate } from "react-router";
 
+import { clearToken, useAuthToken } from "../auth/tokenStore";
 import ThemeToggle from "./ThemeToggle";
 
 /**
@@ -18,6 +19,9 @@ function navLinkClassName({ isActive }: { isActive: boolean }): string {
 }
 
 export default function Navbar() {
+  const token = useAuthToken();
+  const navigate = useNavigate();
+
   return (
     <header className="border-b border-border bg-surface-raised">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-6 px-4">
@@ -41,6 +45,20 @@ export default function Navbar() {
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
+          {token && (
+            <button
+              type="button"
+              onClick={() => {
+                clearToken();
+                void navigate("/login");
+              }}
+              aria-label="Se déconnecter"
+              title="Se déconnecter"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-ink"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>

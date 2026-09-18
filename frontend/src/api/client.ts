@@ -1,6 +1,7 @@
 import axios from "axios";
 
-import type { ApiErrorBody, ChatResponse, Payslip } from "./types";
+import { attachAuth } from "../auth/attachAuth";
+import type { ApiErrorBody, ChatResponse, LoginRequest, Payslip, TokenResponse } from "./types";
 
 export const api = axios.create({
   // `||`, not `??`: an env var set but left empty (`VITE_API_URL=` in a
@@ -10,6 +11,14 @@ export const api = axios.create({
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string must fall back too
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
 });
+
+attachAuth(api);
+
+/** Exchanges credentials for a JWT; rejects with a 401 on bad credentials. */
+export async function login(credentials: LoginRequest): Promise<string> {
+  const { data } = await api.post<TokenResponse>("/api/auth/login", credentials);
+  return data.access_token;
+}
 
 export async function uploadPayslip(file: File): Promise<Payslip> {
   const formData = new FormData();
@@ -48,4 +57,23 @@ export function getApiErrorMessage(error: unknown): string | undefined {
   // Only the string form is a message meant for a human; FastAPI's
   // validation-error array is a payload shape, not a sentence.
   return typeof detail === "string" ? detail : undefined;
+}
+
+export interface RateLimit {
+  /** From the `Retry-After` header; `null` if missing or unreadable. */
+  retryAfterMinutes: number | null;
+}
+
+/** A `RateLimit` if the request failed with a 429, `null` otherwise. */
+export function getRateLimit(error: unknown): RateLimit | null {
+  if (!axios.isAxiosError(error) || error.response?.status !== 429) return null;
+  const seconds = Number(error.response.headers["retry-after"]);
+  return {
+    retryAfterMinutes: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds / 60) : null,
+  };
+}
+
+/** "dans 12 min", or a vaguer wording when the delay is unknown. */
+export function formatRetryDelay({ retryAfterMinutes }: RateLimit): string {
+  return retryAfterMinutes === null ? "plus tard" : `dans ${String(retryAfterMinutes)} min`;
 }
