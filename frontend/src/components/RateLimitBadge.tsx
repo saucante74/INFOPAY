@@ -110,21 +110,43 @@ function secondsUntil(isoDate: string): number {
   return Math.max(0, Math.round((new Date(isoDate).getTime() - Date.now()) / 1000));
 }
 
-/** "3h 42min" / "42min" / "< 1 min" — compact enough for the navbar, and
- * granular enough that the display only changes once a minute (the
- * countdown's own interval still ticks every second, purely so the zero
- * crossing — which triggers a refetch — is caught within a second of it
- * actually happening, not so this text updates that often). */
+/** "3h 42min 18s" / "42min 05s" / "18s" — includes seconds, per the brief,
+ * while still dropping a leading unit that's at zero (no "0h" prefix once
+ * under an hour). Seconds are always shown, zero-padded, since the
+ * countdown's own interval ticks every second anyway. */
 function formatCountdown(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours > 0) return `${String(hours)}h ${String(minutes)}min`;
-  if (minutes > 0) return `${String(minutes)}min`;
-  return "< 1 min";
+  const seconds = totalSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, "0");
+  if (hours > 0) return `${String(hours)}h ${String(minutes)}min ${paddedSeconds}s`;
+  if (minutes > 0) return `${String(minutes)}min ${paddedSeconds}s`;
+  return `${String(seconds)}s`;
 }
 
-/** Which of the two scopes resets first, and when. */
-function pickSoonestReset(limits: RateLimits): { scope: "upload" | "chat"; resetAt: string } {
+/**
+ * Which of the two scopes resets first, and when — considering only scopes
+ * that actually have consumption (`remaining < limit`). A scope nobody has
+ * called yet reports `reset_at` as essentially "now" (`RateLimit.reset_at()`
+ * on the backend returns the current instant when its window holds no
+ * hits), which previously made the countdown pick — and immediately hide
+ * behind — that trivial reset instead of a real one: an unused chat quota
+ * hid the upload countdown even while uploads were actively being
+ * rate-limited. `null` when neither scope has any consumption at all: with
+ * nothing spent, there's no reset a countdown could legitimately point to.
+ */
+function pickSoonestReset(
+  limits: RateLimits
+): { scope: "upload" | "chat"; resetAt: string } | null {
+  const consumed = {
+    upload: limits.upload.remaining < limits.upload.limit,
+    chat: limits.chat.remaining < limits.chat.limit,
+  };
+  if (!consumed.upload && !consumed.chat) return null;
+  if (consumed.upload && !consumed.chat)
+    return { scope: "upload", resetAt: limits.upload.reset_at };
+  if (!consumed.upload && consumed.chat) return { scope: "chat", resetAt: limits.chat.reset_at };
+
   const scope = limits.upload.reset_at <= limits.chat.reset_at ? "upload" : "chat";
   return { scope, resetAt: limits[scope].reset_at };
 }
@@ -177,14 +199,10 @@ function Countdown({ scope, resetAt }: { scope: "upload" | "chat"; resetAt: stri
 
   if (secondsLeft <= 0) return null;
 
-  const scopeLabel = scope === "upload" ? "d'imports" : "de questions";
+  const scopeTitle = scope === "upload" ? "Quota d'imports" : "Quota de questions";
   return (
-    <span
-      className="text-xs whitespace-nowrap text-ink-soft"
-      aria-label={`Réinitialisation du quota ${scopeLabel} dans ${formatCountdown(secondsLeft)}`}
-      title={`Réinitialisation du quota ${scopeLabel}`}
-    >
-      {formatCountdown(secondsLeft)}
+    <span className="text-xs whitespace-nowrap text-ink-soft" title={scopeTitle}>
+      Réinitialisation des quotas dans : {formatCountdown(secondsLeft)}
     </span>
   );
 }
@@ -205,10 +223,16 @@ function Countdown({ scope, resetAt }: { scope: "upload" | "chat"; resetAt: stri
  * gauge's `bg-surface` track in both themes.
  */
 export default function RateLimitBadge({ limits }: RateLimitBadgeProps) {
-  const { scope, resetAt } = pickSoonestReset(limits);
+  const soonestReset = pickSoonestReset(limits);
   return (
     <div className="flex items-center gap-3">
-      <Countdown key={resetAt} scope={scope} resetAt={resetAt} />
+      {soonestReset && (
+        <Countdown
+          key={soonestReset.resetAt}
+          scope={soonestReset.scope}
+          resetAt={soonestReset.resetAt}
+        />
+      )}
       <Gauge status={limits.upload} icon={Upload} noun="imports" remainingWord="restants" />
       <Gauge status={limits.chat} icon={MessageSquare} noun="questions" remainingWord="restantes" />
     </div>

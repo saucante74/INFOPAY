@@ -167,6 +167,7 @@ describe("RateLimitBadge", () => {
 
 describe("RateLimitBadge — countdown to the next reset", () => {
   const NOW = new Date("2025-06-15T12:00:00Z");
+  const COUNTDOWN_TEXT = /^Réinitialisation des quotas dans :/;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -181,14 +182,48 @@ describe("RateLimitBadge — countdown to the next reset", () => {
     return new Date(NOW.getTime() + ms).toISOString();
   }
 
-  it("shows the initial countdown for whichever scope resets soonest", () => {
+  /**
+   * The display condition (remaining < limit on at least one scope) is
+   * deliberately unrelated to `Gauge`'s own low-quota ALERT threshold
+   * (`LOW_QUOTA_THRESHOLD = 3`, tested above under "does not tint a scope
+   * with plenty of quota left" etc.) — a scope with 15/20 remaining is far
+   * from that alert threshold but has still been used at all, which is the
+   * only thing the countdown cares about. These two concepts were
+   * previously conflated in `pickSoonestReset`, which picked *any* scope's
+   * `reset_at` regardless of whether it had been used — see the fix's own
+   * comment on `pickSoonestReset` for the concrete bug this caused.
+   */
+  it("shows as soon as at least one scope has any consumption at all, however small", () => {
+    const limits = makeRateLimits({
+      upload: { remaining: 19, limit: 20, reset_at: isoAfter(60 * 60 * 1000) }, // barely used
+      chat: { remaining: 20, limit: 20, reset_at: isoAfter(0) }, // untouched
+    });
+    render(<RateLimitBadge limits={limits} />);
+
+    expect(screen.getByText(COUNTDOWN_TEXT)).toBeInTheDocument();
+  });
+
+  it("does not let an untouched scope's trivial reset_at hide a real countdown on the other", () => {
+    // Regression case: chat has never been called (reset_at ≈ now, as the
+    // backend reports for an empty window), upload has real consumption
+    // with a genuinely future reset. The countdown must reflect upload's.
+    const limits = makeRateLimits({
+      upload: { remaining: 5, limit: 20, reset_at: isoAfter(60 * 60 * 1000) }, // 1h, consumed
+      chat: { remaining: 20, limit: 20, reset_at: isoAfter(0) }, // untouched
+    });
+    render(<RateLimitBadge limits={limits} />);
+
+    expect(screen.getByText("Réinitialisation des quotas dans : 1h 0min 00s")).toBeInTheDocument();
+  });
+
+  it("shows the initial countdown for whichever scope resets soonest, when both are consumed", () => {
     const limits = makeRateLimits({
       upload: { remaining: 5, limit: 20, reset_at: isoAfter(2 * 60 * 60 * 1000) }, // 2h
       chat: { remaining: 5, limit: 20, reset_at: isoAfter(3.5 * 60 * 60 * 1000) }, // 3h30
     });
     render(<RateLimitBadge limits={limits} />);
 
-    expect(screen.getByText("2h 0min")).toBeInTheDocument();
+    expect(screen.getByText("Réinitialisation des quotas dans : 2h 0min 00s")).toBeInTheDocument();
   });
 
   it("picks the soonest reset regardless of which scope (upload or chat) it belongs to", () => {
@@ -198,36 +233,35 @@ describe("RateLimitBadge — countdown to the next reset", () => {
     });
     render(<RateLimitBadge limits={limits} />);
 
-    expect(screen.getByText("45min")).toBeInTheDocument();
-    expect(screen.getByText("45min")).toHaveAccessibleName(
-      "Réinitialisation du quota de questions dans 45min"
-    );
+    expect(screen.getByText("Réinitialisation des quotas dans : 45min 00s")).toBeInTheDocument();
   });
 
-  it("updates live as time passes, without a re-render from the parent", () => {
+  it("updates live (including seconds) as time passes, without a re-render from the parent", () => {
     const limits = makeRateLimits({
       upload: { remaining: 5, limit: 20, reset_at: isoAfter(60 * 60 * 1000) }, // 1h
       chat: { remaining: 5, limit: 20, reset_at: isoAfter(5 * 60 * 60 * 1000) },
     });
     render(<RateLimitBadge limits={limits} />);
-    expect(screen.getByText("1h 0min")).toBeInTheDocument();
+    expect(screen.getByText("Réinitialisation des quotas dans : 1h 0min 00s")).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(20 * 60 * 1000); // 20 minutes later
+      vi.advanceTimersByTime(20 * 60 * 1000 + 5000); // 20 minutes and 5 seconds later
     });
 
-    expect(screen.queryByText("1h 0min")).not.toBeInTheDocument();
-    expect(screen.getByText("40min")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Réinitialisation des quotas dans : 1h 0min 00s")
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Réinitialisation des quotas dans : 39min 55s")).toBeInTheDocument();
   });
 
-  it("shows under a minute as '< 1 min' rather than '0min'", () => {
+  it("shows under a minute in seconds only, not '0min 18s'", () => {
     const limits = makeRateLimits({
-      upload: { remaining: 5, limit: 20, reset_at: isoAfter(30 * 1000) },
+      upload: { remaining: 5, limit: 20, reset_at: isoAfter(18 * 1000) },
       chat: { remaining: 5, limit: 20, reset_at: isoAfter(5 * 60 * 60 * 1000) },
     });
     render(<RateLimitBadge limits={limits} />);
 
-    expect(screen.getByText("< 1 min")).toBeInTheDocument();
+    expect(screen.getByText("Réinitialisation des quotas dans : 18s")).toBeInTheDocument();
   });
 
   it("disappears and triggers exactly one refetch once the countdown reaches zero", async () => {
@@ -236,7 +270,7 @@ describe("RateLimitBadge — countdown to the next reset", () => {
       chat: { remaining: 5, limit: 20, reset_at: isoAfter(5 * 60 * 60 * 1000) },
     });
     render(<RateLimitBadge limits={limits} />);
-    expect(screen.getByText("< 1 min")).toBeInTheDocument();
+    expect(screen.getByText(COUNTDOWN_TEXT)).toBeInTheDocument();
     expect(mockFetchRateLimits).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -244,7 +278,7 @@ describe("RateLimitBadge — countdown to the next reset", () => {
       await Promise.resolve();
     });
 
-    expect(screen.queryByText("< 1 min")).not.toBeInTheDocument();
+    expect(screen.queryByText(COUNTDOWN_TEXT)).not.toBeInTheDocument();
     expect(mockFetchRateLimits).toHaveBeenCalledTimes(1);
 
     // Further ticks past zero don't fire it again (no aggressive polling).
@@ -255,13 +289,23 @@ describe("RateLimitBadge — countdown to the next reset", () => {
     expect(mockFetchRateLimits).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render a countdown at all once both scopes' reset_at are in the past", () => {
+  it("does not render a countdown at all when neither scope has any consumption", () => {
     const limits = makeRateLimits({
-      upload: { remaining: 20, limit: 20, reset_at: isoAfter(-1000) },
-      chat: { remaining: 20, limit: 20, reset_at: isoAfter(-1000) },
+      upload: { remaining: 20, limit: 20, reset_at: isoAfter(0) },
+      chat: { remaining: 20, limit: 20, reset_at: isoAfter(0) },
     });
     render(<RateLimitBadge limits={limits} />);
 
-    expect(screen.queryByText(/min|h /)).not.toBeInTheDocument();
+    expect(screen.queryByText(COUNTDOWN_TEXT)).not.toBeInTheDocument();
+  });
+
+  it("does not render a countdown once both consumed scopes' reset_at are in the past", () => {
+    const limits = makeRateLimits({
+      upload: { remaining: 5, limit: 20, reset_at: isoAfter(-1000) },
+      chat: { remaining: 5, limit: 20, reset_at: isoAfter(-1000) },
+    });
+    render(<RateLimitBadge limits={limits} />);
+
+    expect(screen.queryByText(COUNTDOWN_TEXT)).not.toBeInTheDocument();
   });
 });
