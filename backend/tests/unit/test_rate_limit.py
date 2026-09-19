@@ -7,7 +7,13 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import HTTPException
 
-from app.rate_limit import DEFAULT_LIMIT_PER_HOUR, RateLimit, get_rate_limit_per_hour
+from app.rate_limit import (
+    DEFAULT_LIMIT_PER_HOUR,
+    DEFAULT_WINDOW_HOURS,
+    RateLimit,
+    get_rate_limit_per_hour,
+    get_rate_limit_window_seconds,
+)
 
 
 class FakeClock:
@@ -165,3 +171,44 @@ def test_reset_at_tracks_the_oldest_hit_expiring():
     clock.now += 1800  # halfway through the window
     delta_later = (limiter.reset_at() - datetime.now(UTC)).total_seconds()
     assert 1790 < delta_later <= 1800
+
+
+# --- window configurability (RATE_LIMIT_WINDOW_HOURS) ----------------------
+# Mirrors the limit()/RATE_LIMIT_PER_HOUR tests above: `window_seconds=None`
+# (the default) reads the env var live, same as `limit=None` already does.
+
+
+def test_window_defaults_when_env_var_is_absent(monkeypatch):
+    monkeypatch.delenv("RATE_LIMIT_WINDOW_HOURS", raising=False)
+    assert get_rate_limit_window_seconds() == DEFAULT_WINDOW_HOURS * 3600
+
+
+def test_window_is_read_from_env(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_HOURS", "4")
+    assert get_rate_limit_window_seconds() == 4 * 3600
+
+
+@pytest.mark.parametrize("value", ["0", "-3", "four", "2.5"])
+def test_invalid_window_is_rejected(monkeypatch, value):
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_HOURS", value)
+    with pytest.raises(RuntimeError, match="RATE_LIMIT_WINDOW_HOURS"):
+        get_rate_limit_window_seconds()
+
+
+def test_window_reads_the_env_var_when_not_fixed_at_construction(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_HOURS", "4")
+    limiter = RateLimit("test", clock=FakeClock())
+    assert limiter.window() == 4 * 3600
+
+
+def test_window_from_env_is_actually_enforced(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_HOURS", "4")
+    clock = FakeClock()
+    limiter = RateLimit("test", limit=1, clock=clock)
+    limiter()
+
+    clock.now += 3600  # one hour later: a 1h window would have freed up by now
+    _call_expecting_429(limiter)
+
+    clock.now += 3 * 3600  # four hours total: the 4h window has now elapsed
+    limiter()

@@ -172,6 +172,7 @@ def test_chat_with_valid_token_is_200(auth_client, token, fake_llm):
 @pytest.fixture
 def limit_of_two(monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "2")
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_HOURS", "1")
 
 
 def test_upload_is_rate_limited(auth_client, token, sample_pdf_bytes, limit_of_two):

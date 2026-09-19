@@ -1,3 +1,6 @@
+import { FileDown } from "lucide-react";
+import { Link } from "react-router";
+
 import ChatPanel from "../components/ChatPanel";
 import PayslipChart from "../components/PayslipChart";
 import PayslipTable from "../components/PayslipTable";
@@ -19,6 +22,16 @@ export default function AnalyzerPage() {
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-4 overflow-y-auto pr-1">
+          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-ink-soft">
+            <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <p>
+              Pas de bulletin de paie ?{" "}
+              <Link to="/aide#exemples" className="font-medium text-accent hover:underline">
+                Téléchargez un exemple pour tester l'application.
+              </Link>
+            </p>
+          </div>
+
           <UploadZone onUploaded={addPayslip} />
 
           {!isLoading && (

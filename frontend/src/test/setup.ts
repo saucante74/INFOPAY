@@ -40,6 +40,18 @@ Element.prototype.scrollTo = () => {
 };
 
 /**
+ * jsdom implements no `Element.prototype.scrollIntoView` at all (unlike
+ * `scrollTo` above, it isn't even defined — calling it throws
+ * `TypeError: ... is not a function`). `RootLayout` calls it to jump to a
+ * route's `#hash` target (e.g. `/aide#exemples`) on navigation. Same
+ * no-op stub, same reasoning: no real layout to assert a scroll position
+ * against under jsdom.
+ */
+Element.prototype.scrollIntoView = () => {
+  // no-op: see the comment above.
+};
+
+/**
  * jsdom implements no `window.matchMedia` at all — used by `useTheme` to
  * read the system color-scheme preference. Defaults to "system prefers
  * light" (`matches: false`); tests that need "system prefers dark"
