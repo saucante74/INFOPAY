@@ -24,9 +24,7 @@ describe("AnalyzerPage — sample payslip banner", () => {
   it("links to the Help page's downloadable-examples section", () => {
     renderWithRouter(<AnalyzerPage />);
 
-    expect(
-      screen.getByText("Pas de bulletin de paie ?", { exact: false })
-    ).toBeInTheDocument();
+    expect(screen.getByText("Pas de bulletin de paie ?", { exact: false })).toBeInTheDocument();
 
     const link = screen.getByRole("link", {
       name: "Téléchargez un exemple pour tester l'application.",

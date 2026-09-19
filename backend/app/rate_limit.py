@@ -28,7 +28,8 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException, status
 
 DEFAULT_LIMIT_PER_HOUR = 20
-WINDOW_SECONDS = 3600.0
+DEFAULT_WINDOW_HOURS = 1
+SECONDS_PER_HOUR = 3600.0
 
 
 def get_rate_limit_per_hour() -> int:
@@ -38,6 +39,17 @@ def get_rate_limit_per_hour() -> int:
     if not raw.isdigit() or int(raw) == 0:
         raise RuntimeError(f"RATE_LIMIT_PER_HOUR doit être un entier positif (reçu : {raw!r}).")
     return int(raw)
+
+
+def get_rate_limit_window_seconds() -> float:
+    raw = os.environ.get("RATE_LIMIT_WINDOW_HOURS", "").strip()
+    if not raw:
+        return DEFAULT_WINDOW_HOURS * SECONDS_PER_HOUR
+    if not raw.isdigit() or int(raw) == 0:
+        raise RuntimeError(
+            f"RATE_LIMIT_WINDOW_HOURS doit être un entier positif (reçu : {raw!r})."
+        )
+    return int(raw) * SECONDS_PER_HOUR
 
 
 class RateLimit:
@@ -51,7 +63,7 @@ class RateLimit:
         self,
         scope: str,
         limit: int | None = None,
-        window_seconds: float = WINDOW_SECONDS,
+        window_seconds: float | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.scope = scope
@@ -69,7 +81,7 @@ class RateLimit:
             now = self._clock()
             self._prune(now)
             if len(self._hits) >= limit:
-                retry_after = max(1, math.ceil(self._hits[0] + self._window - now))
+                retry_after = max(1, math.ceil(self._hits[0] + self.window() - now))
                 requests = "requête" if limit == 1 else "requêtes"
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -84,7 +96,8 @@ class RateLimit:
     def _prune(self, now: float) -> None:
         """Drops hits that have aged out of the window. Caller must already
         hold `_lock`."""
-        while self._hits and self._hits[0] <= now - self._window:
+        window = self.window()
+        while self._hits and self._hits[0] <= now - window:
             self._hits.popleft()
 
     def limit(self) -> int:
@@ -92,6 +105,12 @@ class RateLimit:
         call when not fixed at construction, same as `__call__`, so this
         never disagrees with what actually gets enforced."""
         return self._limit if self._limit is not None else get_rate_limit_per_hour()
+
+    def window(self) -> float:
+        """The window duration (seconds) currently in effect — recomputed
+        from the env var each call when not fixed at construction, mirroring
+        `limit()` above."""
+        return self._window if self._window is not None else get_rate_limit_window_seconds()
 
     def remaining(self) -> int:
         """Requests still allowed in the current window, from the hits
@@ -114,7 +133,7 @@ class RateLimit:
             if not self._hits:
                 seconds_until_free_slot = 0.0
             else:
-                seconds_until_free_slot = max(0.0, self._hits[0] + self._window - now)
+                seconds_until_free_slot = max(0.0, self._hits[0] + self.window() - now)
         return datetime.now(UTC) + timedelta(seconds=seconds_until_free_slot)
 
     def reset(self) -> None:

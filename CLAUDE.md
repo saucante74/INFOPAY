@@ -104,7 +104,9 @@ file itself, so editing a workflow re-runs it).
 A single account protects the whole API; see README.md, "Authentication",
 for the password-hash command and the `.env` variables (`ADMIN_USERNAME`,
 `ADMIN_PASSWORD_HASH`, `JWT_SECRET`, optional `JWT_EXPIRE_HOURS`,
-`RATE_LIMIT_PER_HOUR` and `LOGIN_RATE_LIMIT_PER_15MIN`). The backend
+`RATE_LIMIT_PER_HOUR`, optional `RATE_LIMIT_WINDOW_HOURS` (default 1,
+currently set to 4 — the sliding-window duration `RATE_LIMIT_PER_HOUR`
+applies over) and `LOGIN_RATE_LIMIT_PER_15MIN`). The backend
 **refuses to start** if they're missing or malformed, so any command that
 runs the app's lifespan (uvicorn, `generate:api-types` against a live
 server) needs them set. The test suite doesn't: it never triggers the

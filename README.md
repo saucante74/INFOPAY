@@ -58,6 +58,7 @@ ADMIN_PASSWORD_HASH='$2b$12$...paste the hash here...'
 JWT_SECRET=...paste the secret here...
 JWT_EXPIRE_HOURS=24        # optional, default 24
 RATE_LIMIT_PER_HOUR=20     # optional, default 20 (see below)
+RATE_LIMIT_WINDOW_HOURS=4  # optional, default 1 (see below)
 LOGIN_RATE_LIMIT_PER_15MIN=5   # optional, default 5 (see below)
 ```
 
@@ -75,10 +76,11 @@ out every open session.
 
 **Rate limiting.** `/api/upload` and `/api/chat` call the Anthropic API and
 cost money, so each is limited to `RATE_LIMIT_PER_HOUR` requests per
-sliding hour (separate counters). Past it, the API answers `429` with a
-`Retry-After` header and the UI says when to retry. Counters live in memory:
-they reset on restart, and running several uvicorn workers would multiply
-the effective limit (the Dockerfile runs one).
+sliding window of `RATE_LIMIT_WINDOW_HOURS` hours (separate counters).
+Past it, the API answers `429` with a `Retry-After` header and the UI says
+when to retry. Counters live in memory: they reset on restart, and running
+several uvicorn workers would multiply the effective limit (the Dockerfile
+runs one).
 
 **Login rate limiting.** `POST /api/auth/login` is separately limited to
 `LOGIN_RATE_LIMIT_PER_15MIN` attempts per **client IP** (not a shared
