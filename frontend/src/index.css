@@ -19,6 +19,7 @@
   --color-alert-soft: #fef3c7;
   --color-chart-net: #2a78d6;
   --color-chart-cotisations: #4a3aa7;
+  --color-chart-net-imposable: #ea580c;
 }
 
 body {
@@ -107,6 +108,7 @@ body {
     --color-alert-soft: #78350f;
     --color-chart-net: #4a90e2;
     --color-chart-cotisations: #9333ea;
+    --color-chart-net-imposable: #ea580c;
   }
 }
 
@@ -122,4 +124,5 @@ body {
   --color-alert-soft: #78350f;
   --color-chart-net: #4a90e2;
   --color-chart-cotisations: #9333ea;
+  --color-chart-net-imposable: #ea580c;
 }

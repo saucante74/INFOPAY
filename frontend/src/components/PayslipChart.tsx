@@ -68,6 +68,7 @@ export default function PayslipChart({ payslips }: PayslipChartProps) {
   const data = sortChronologically(payslips).map((p) => ({
     mois: p.mois_annee,
     Brut: p.salaire_brut,
+    "Net imposable": p.net_imposable,
     "Net à payer": p.net_a_payer,
     Cotisations: p.total_cotisations_salariales,
   }));
@@ -109,6 +110,15 @@ export default function PayslipChart({ payslips }: PayslipChartProps) {
             type="monotone"
             dataKey="Brut"
             stroke="var(--color-accent)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            dot={{ r: 3, strokeWidth: 2, fill: "var(--color-surface-raised)" }}
+            activeDot={{ r: 5 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="Net imposable"
+            stroke="var(--color-chart-net-imposable)"
             strokeWidth={2.5}
             strokeLinecap="round"
             dot={{ r: 3, strokeWidth: 2, fill: "var(--color-surface-raised)" }}
