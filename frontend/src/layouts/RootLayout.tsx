@@ -1,4 +1,5 @@
-import { Outlet } from "react-router";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router";
 
 import LoginModal from "../auth/LoginModal";
 import Footer from "../components/Footer";
@@ -17,6 +18,19 @@ import Navbar from "../components/Navbar";
  * page is showing underneath. It renders `null` while closed either way.
  */
 export default function RootLayout() {
+  const location = useLocation();
+
+  // Plain `<Routes>`/`<Route>` (not a data router) does no scroll handling
+  // of its own — `<ScrollRestoration>`'s hash support is data-router-only —
+  // so a link like `/aide#exemples` would otherwise land on "/aide" at the
+  // top of the page instead of at the anchored section. Re-runs on every
+  // navigation (`RootLayout` stays mounted across all of them, per the
+  // class comment above), and does nothing when there's no hash.
+  useEffect(() => {
+    if (!location.hash) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [location.pathname, location.hash]);
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />

@@ -32,8 +32,9 @@ function getSnapshot(): RateLimits | null {
 }
 
 /** Replaces local state with a fresh server read — the source of truth
- * after login, or if a caller ever needs to force a resync. */
-async function refreshRateLimits(): Promise<void> {
+ * after login, or if a caller ever needs to force a resync (e.g.
+ * `RateLimitCountdown` in `RateLimitBadge.tsx`, once its window elapses). */
+export async function refreshRateLimits(): Promise<void> {
   state = await fetchRateLimits();
   notify();
 }

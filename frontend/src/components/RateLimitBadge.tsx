@@ -1,8 +1,9 @@
 import { MessageSquare, Upload } from "lucide-react";
 import type { ComponentType } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { RateLimits, RateLimitStatus } from "../api/types";
+import { refreshRateLimits } from "../hooks/useRateLimits";
 
 /** Matches the brief's own "≤ 3 restants" example — not tied to any
  * particular `limit` value, so it still means something whether the
@@ -105,6 +106,107 @@ function Gauge({ status, icon: Icon, noun, remainingWord }: GaugeProps) {
   );
 }
 
+function secondsUntil(isoDate: string): number {
+  return Math.max(0, Math.round((new Date(isoDate).getTime() - Date.now()) / 1000));
+}
+
+/** "3h 42min 18s" / "42min 05s" / "18s" — includes seconds, per the brief,
+ * while still dropping a leading unit that's at zero (no "0h" prefix once
+ * under an hour). Seconds are always shown, zero-padded, since the
+ * countdown's own interval ticks every second anyway. */
+function formatCountdown(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, "0");
+  if (hours > 0) return `${String(hours)}h ${String(minutes)}min ${paddedSeconds}s`;
+  if (minutes > 0) return `${String(minutes)}min ${paddedSeconds}s`;
+  return `${String(seconds)}s`;
+}
+
+/**
+ * Which of the two scopes resets first, and when — considering only scopes
+ * that actually have consumption (`remaining < limit`). A scope nobody has
+ * called yet reports `reset_at` as essentially "now" (`RateLimit.reset_at()`
+ * on the backend returns the current instant when its window holds no
+ * hits), which previously made the countdown pick — and immediately hide
+ * behind — that trivial reset instead of a real one: an unused chat quota
+ * hid the upload countdown even while uploads were actively being
+ * rate-limited. `null` when neither scope has any consumption at all: with
+ * nothing spent, there's no reset a countdown could legitimately point to.
+ */
+function pickSoonestReset(
+  limits: RateLimits
+): { scope: "upload" | "chat"; resetAt: string } | null {
+  const consumed = {
+    upload: limits.upload.remaining < limits.upload.limit,
+    chat: limits.chat.remaining < limits.chat.limit,
+  };
+  if (!consumed.upload && !consumed.chat) return null;
+  if (consumed.upload && !consumed.chat)
+    return { scope: "upload", resetAt: limits.upload.reset_at };
+  if (!consumed.upload && consumed.chat) return { scope: "chat", resetAt: limits.chat.reset_at };
+
+  const scope = limits.upload.reset_at <= limits.chat.reset_at ? "upload" : "chat";
+  return { scope, resetAt: limits[scope].reset_at };
+}
+
+/**
+ * Countdown to the soonest of the two scopes' `reset_at` — reused from
+ * `limits`, the same prop the gauges already render from, so this adds no
+ * network call of its own (per the brief). Ticks client-side from a
+ * `setInterval`, not a per-second refetch.
+ *
+ * Rendered with `key={resetAt}` by `RateLimitBadge` below: when `resetAt`
+ * changes (a new window opened after a refetch, or the soonest-resetting
+ * scope switched), React remounts this component from scratch instead of
+ * this effect reaching back to resync `secondsLeft` itself — the same
+ * "reset state via `key`" pattern React's own docs recommend over calling
+ * `setState` synchronously inside an effect (flagged by this project's
+ * `react-hooks/set-state-in-effect` lint rule).
+ *
+ * Hidden once it reaches zero rather than showing "0h 0min": at that point
+ * the window has already slid open server-side, so the honest state is
+ * "quota renewed," not "still counting down." A single `refreshRateLimits()`
+ * call (guarded by `hasRefreshedRef` so it fires once, not every remaining
+ * tick of the interval) brings `limits` back in sync — `Navbar`'s own
+ * `useRateLimits()` re-renders this component with the fresh numbers once
+ * that resolves, same as after any other `decrementRateLimit`/refetch.
+ */
+function Countdown({ scope, resetAt }: { scope: "upload" | "chat"; resetAt: string }) {
+  const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(resetAt));
+  const hasRefreshedRef = useRef(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSecondsLeft(secondsUntil(resetAt));
+    }, 1000);
+    return () => {
+      clearInterval(id);
+    };
+  }, [resetAt]);
+
+  useEffect(() => {
+    if (secondsLeft <= 0 && !hasRefreshedRef.current) {
+      hasRefreshedRef.current = true;
+      refreshRateLimits().catch(() => {
+        // Intentionally silent — same convention as useRateLimits' own
+        // fetch: a failed resync just leaves the badge as-is until the next
+        // successful upload/chat call or page load reconciles it.
+      });
+    }
+  }, [secondsLeft]);
+
+  if (secondsLeft <= 0) return null;
+
+  const scopeTitle = scope === "upload" ? "Quota d'imports" : "Quota de questions";
+  return (
+    <span className="text-xs whitespace-nowrap text-ink-soft" title={scopeTitle}>
+      Réinitialisation des quotas dans : {formatCountdown(secondsLeft)}
+    </span>
+  );
+}
+
 /**
  * Battery-style quota gauges, one per rate-limited scope — replaces the
  * previous plain-text "15/20 imports · 18/20 questions" badge with the
@@ -121,8 +223,16 @@ function Gauge({ status, icon: Icon, noun, remainingWord }: GaugeProps) {
  * gauge's `bg-surface` track in both themes.
  */
 export default function RateLimitBadge({ limits }: RateLimitBadgeProps) {
+  const soonestReset = pickSoonestReset(limits);
   return (
     <div className="flex items-center gap-3">
+      {soonestReset && (
+        <Countdown
+          key={soonestReset.resetAt}
+          scope={soonestReset.scope}
+          resetAt={soonestReset.resetAt}
+        />
+      )}
       <Gauge status={limits.upload} icon={Upload} noun="imports" remainingWord="restants" />
       <Gauge status={limits.chat} icon={MessageSquare} noun="questions" remainingWord="restantes" />
     </div>
