@@ -5,6 +5,9 @@ frontend/eslint.config.js linguist-generated=true
 frontend/vite.config.ts linguist-generated=true
 frontend/vitest.config.ts linguist-generated=true
 frontend/postcss.config.js linguist-generated=true
+frontend/components/** linguist-generated=true
+frontend/pages/** linguist-generated=true
+frontend/test/** linguist-generated=true
 frontend/.prettierrc.json linguist-generated=true
 
 frontend/package-lock.json linguist-generated=true

@@ -76,7 +76,7 @@ export default function Navbar() {
               }}
               aria-label="Se déconnecter"
               title="Se déconnecter"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-ink"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-surface hover:text-alert"
             >
               <LogOut className="h-4 w-4" />
             </button>
